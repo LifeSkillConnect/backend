@@ -1,10 +1,32 @@
 import express from "express";
-import { sendOtp, validateEmail, verifyOtp } from "../views/authentication-view";
+import {
+  validateEmail,
+  sendOtp,
+  verifyOtp,
+  createAccount,
+  login,
+//   updateDetails,
+  startGoogleAuth,
+  googleCallback,
+  resetPassword,
+} from "../views/authentication-view";
 
 const router = express.Router();
 
+// Email & OTP Routes
 router.post("/validate-email", validateEmail);
 router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
+
+// Account Management
+router.post("/create-account", createAccount);
+router.post("/login", login);
+router.put("/reset-password", resetPassword);
+// router.put("/update", updateDetails);
+
+// Google Authentication
+router.get("/google", startGoogleAuth);
+router.get("/google/callback", googleCallback);
+
 
 export default router;

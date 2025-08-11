@@ -10,8 +10,17 @@ export interface ValidateEmailPayload {
 export interface CreateAccountPayload {
   email: string;
   password :string,
-  phoneNumber?: string;
-  fullName?: string;
-  dateOfBirth?: Date;
+  phoneNumber: string;
+  fullName: string;
+  dateOfBirth: Date;
   howdidyouhearaboutus?: string;
+}
+export interface GoogleUserProfile {
+  id: string;
+  email: string;
+  verified_email: boolean;
+  name: string;
+  given_name: string;
+  family_name: string;
+  picture: string;
 }

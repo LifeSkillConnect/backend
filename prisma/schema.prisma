@@ -17,12 +17,12 @@ model User {
   id                   String   @id @default(cuid())
   email                String   @unique
   fullname             String
-  phoneNumber          String
+  phoneNumber          String?
   password             String?
   authProvider         String   @default("EMAIL") // Possible values: EMAIL, GOOGLE, FACEBOOK, APPLE
   role                 String   @default("USER") // Possible values: USER, ADMIN
   isActive             Boolean  @default(true)
-  dateOfBirth          DateTime
+  dateOfBirth          DateTime?
   profilePicture       String? // Optional field for profile picture URL
   howdidyouhearaboutus String? // Optional field for referral source
   createdAt            DateTime @default(now())
