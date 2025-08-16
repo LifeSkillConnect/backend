@@ -9,6 +9,9 @@ import {
   startGoogleAuth,
   googleCallback,
   resetPassword,
+  fetchAllModules,
+  addModulesToUser,
+  saveModule,
 } from "../views/authentication-view";
 
 const router = express.Router();
@@ -27,6 +30,12 @@ router.put("/reset-password", resetPassword);
 // Google Authentication
 router.get("/google", startGoogleAuth);
 router.get("/google/callback", googleCallback);
+
+// Add Modules to User
+router.get("/get-modules", fetchAllModules);
+router.post("/assign-modules", addModulesToUser);
+router.post("/add-modules", saveModule);
+
 
 
 export default router;

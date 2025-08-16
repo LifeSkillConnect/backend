@@ -9,7 +9,7 @@ export interface ValidateEmailPayload {
 
 export interface CreateAccountPayload {
   email: string;
-  password :string,
+  password: string;
   phoneNumber: string;
   fullName: string;
   dateOfBirth: Date;
@@ -23,4 +23,19 @@ export interface GoogleUserProfile {
   given_name: string;
   family_name: string;
   picture: string;
+}
+
+export interface AddModuleToUserPayLoad {
+  email: string;
+  moduleIds: string[];
+}
+
+export interface ModulePayload {
+  title: string;
+  plan_type: "free" | "premium";
+  isCertificationOnCompletion: boolean;
+  total_hours: number;
+  subtitle_available: boolean;
+  description: string;
+  features: string[];
 }

@@ -2,8 +2,10 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import {
+  AddModuleToUserPayLoad,
   CreateAccountPayload,
   GoogleUserProfile,
+  ModulePayload,
   SendOtpPayload,
   ValidateEmailPayload,
 } from "../types/auth.types";
@@ -400,72 +402,72 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
-export const updateDetails = async (req: Request, res: Response) => {
-  try {
-    // Validate request body
-    await updateUserSchema.validate(req.body, { abortEarly: false });
+// export const updateDetails = async (req: Request, res: Response) => {
+//   try {
+//     // Validate request body
+//     await updateUserSchema.validate(req.body, { abortEarly: false });
 
-    const { email, ...body } = req.body;
+//     const { email, ...body } = req.body;
 
-    // Find user
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+//     // Find user
+//     const existingUser = await prisma.user.findUnique({
+//       where: { email },
+//     });
 
-    if (!existingUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
+//     if (!existingUser) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
 
-    // Block Google/Apple accounts if needed
-    if (
-      existingUser.authProvider &&
-      ["google", "apple"].includes(existingUser.authProvider)
-    ) {
-      return res.status(403).json({
-        message: "Cannot manually update Google/Apple linked accounts",
-      });
-    }
+//     // Block Google/Apple accounts if needed
+//     if (
+//       existingUser.authProvider &&
+//       ["google", "apple"].includes(existingUser.authProvider)
+//     ) {
+//       return res.status(403).json({
+//         message: "Cannot manually update Google/Apple linked accounts",
+//       });
+//     }
 
-    // Remove null/empty values
-    const updates: Record<string, any> = {};
-    for (const [key, value] of Object.entries(body)) {
-      if (value !== null && value !== undefined && value !== "") {
-        updates[key] = value;
-      }
-    }
+//     // Remove null/empty values
+//     const updates: Record<string, any> = {};
+//     for (const [key, value] of Object.entries(body)) {
+//       if (value !== null && value !== undefined && value !== "") {
+//         updates[key] = value;
+//       }
+//     }
 
-    // Only keep changed values
-    const finalUpdates: Record<string, any> = {};
-    for (const [key, value] of Object.entries(updates)) {
-      if ((existingUser as any)[key] !== value) {
-        finalUpdates[key] = value;
-      }
-    }
+//     // Only keep changed values
+//     const finalUpdates: Record<string, any> = {};
+//     for (const [key, value] of Object.entries(updates)) {
+//       if ((existingUser as any)[key] !== value) {
+//         finalUpdates[key] = value;
+//       }
+//     }
 
-    // If no changes, return user without updating
-    if (Object.keys(finalUpdates).length === 0) {
-      return res.status(200).json({ user: existingUser });
-    }
+//     // If no changes, return user without updating
+//     if (Object.keys(finalUpdates).length === 0) {
+//       return res.status(200).json({ user: existingUser });
+//     }
 
-    const updatedUser = await prisma.user.update({
-      where: { email },
-      data: finalUpdates,
-    });
+//     const updatedUser = await prisma.user.update({
+//       where: { email },
+//       data: finalUpdates,
+//     });
 
-    res.status(200).json({
-      message: "Details updated successfully",
-      user: updatedUser,
-    });
-  } catch (error: any) {
-    if (error.name === "ValidationError") {
-      return res.status(400).json({
-        errors: error.errors,
-      });
-    }
-    console.error("Update details error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
+//     res.status(200).json({
+//       message: "Details updated successfully",
+//       user: updatedUser,
+//     });
+//   } catch (error: any) {
+//     if (error.name === "ValidationError") {
+//       return res.status(400).json({
+//         errors: error.errors,
+//       });
+//     }
+//     console.error("Update details error:", error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// };
 
 export const resetPassword = async (req: Request, res: Response) => {
   try {
@@ -508,6 +510,135 @@ export const resetPassword = async (req: Request, res: Response) => {
       success: false,
       message: "Server error",
       error: error.message,
+    });
+  }
+};
+
+// Fetch All Modules
+export const fetchAllModules = async (req: Request, res: Response) => {
+  try {
+    const modules = await prisma.module.findMany({});
+    return res.status(200).json({
+      success: true,
+      modules,
+    });
+  } catch (error) {
+    console.error("Error fetching modules:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Add Modules to User
+export const addModulesToUser = async (req: Request, res: Response) => {
+  try {
+    const { email, moduleIds } = req.body as AddModuleToUserPayLoad;
+
+    // Basic payload validation
+    if (!email || !Array.isArray(moduleIds) || moduleIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and an array of module IDs are required",
+      });
+    }
+
+    // 1. Find the user
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // 2. Validate module IDs exist
+    const existingModules = await prisma.module.findMany({
+      where: { id: { in: moduleIds } },
+      select: { id: true },
+    });
+
+    const existingModuleIds = existingModules.map((m) => m.id);
+    const invalidModuleIds = moduleIds.filter(
+      (id) => !existingModuleIds.includes(id)
+    );
+
+    if (invalidModuleIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid module IDs: ${invalidModuleIds.join(", ")}`,
+      });
+    }
+
+    // 3. Assign modules to user
+    await prisma.module.updateMany({
+      where: { id: { in: existingModuleIds } },
+      data: { userId: user.id },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Modules successfully assigned to user",
+    });
+  } catch (error) {
+    console.error("Error adding modules to user:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const saveModule = async (req: Request, res: Response) => {
+  try {
+    const data = req.body as ModulePayload;
+
+    // --- 1. Basic validation ---
+    if (!data.title || !data.plan_type || !data.total_hours) {
+      return res.status(400).json({
+        success: false,
+        message: "title, plan_type, and total_hours are required fields",
+      });
+    }
+
+    if (!["free", "premium"].includes(data.plan_type)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid plan_type. Must be 'free' or 'premium'",
+      });
+    }
+
+    if (!Array.isArray(data.features) || data.features.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "features must be a non-empty array",
+      });
+    }
+
+    // --- 3. Save to database ---
+    const module = await prisma.module.create({
+      data: {
+        title: data.title,
+        plan_type: data.plan_type,
+        isCertificationOnCompletion: data.isCertificationOnCompletion ?? false,
+        total_hours: data.total_hours,
+        subtitle_available: data.subtitle_available ?? false,
+        description: data.description ?? null,
+        features: data.features,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Module created successfully",
+      module,
+    });
+  } catch (error) {
+    console.error("Error saving module:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
     });
   }
 };
