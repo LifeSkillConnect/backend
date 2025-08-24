@@ -26,7 +26,7 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI =
   process.env.GOOGLE_REDIRECT_URI ||
-  "http://localhost:3000/api/v1/auth/google/callback";
+  "https://backend-azure-chi.vercel.app/api/v1/auth/google/callback";
 
 // Step 1: Redirect user to Google OAuth consent screen
 export const startGoogleAuth = (req: Request, res: Response) => {
