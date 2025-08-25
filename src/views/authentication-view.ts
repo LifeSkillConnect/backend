@@ -42,7 +42,9 @@ export const googleCallback = async (req: Request, res: Response) => {
 
   if (!code) {
     console.error("No authorization code provided");
-    return res.redirect("/login");
+    return res.redirect(
+      "lifeskillconnect://auth/callback?success=false&error=no_code"
+    );
   }
 
   try {
@@ -107,13 +109,19 @@ export const googleCallback = async (req: Request, res: Response) => {
       { expiresIn: "1h" }
     );
 
-return res.redirect(`milove://auth/login?token=${token}`);
+    return res.redirect(
+      `lifeskillconnect://(account)/account?success=true&token=${token}`
+    );
   } catch (error: any) {
     console.error(
       "Error during Google OAuth:",
       error?.response?.data || error.message
     );
-    res.redirect("/login");
+    return res.redirect(
+      `lifeskillconnect://(account)/account?success=false&error=${encodeURIComponent(
+        error.message
+      )}`
+    );
   }
 };
 

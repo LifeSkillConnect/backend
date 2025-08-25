@@ -15,7 +15,7 @@ router.post("/create-account", authentication_view_1.createAccount);
 router.post("/login", authentication_view_1.login);
 router.put("/reset-password", authentication_view_1.resetPassword);
 // router.put("/update", updateDetails);
-// Google Authentication
+// Google Authentication Service
 router.get("/google", authentication_view_1.startGoogleAuth);
 router.get("/google/callback", authentication_view_1.googleCallback);
 // Add Modules to User

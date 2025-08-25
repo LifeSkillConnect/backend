@@ -48,7 +48,7 @@ const prisma = new client_1.PrismaClient();
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI ||
-    "http://localhost:3000/api/v1/auth/google/callback";
+    "https://backend-azure-chi.vercel.app/api/v1/auth/google/callback";
 // Step 1: Redirect user to Google OAuth consent screen
 const startGoogleAuth = (req, res) => {
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=profile email&access_type=offline&prompt=consent`;
@@ -98,10 +98,7 @@ const googleCallback = async (req, res) => {
             });
         }
         const token = jsonwebtoken_1.default.sign({ userId: isPresent.id, email: isPresent.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
-        return res.status(200).json({
-            success: true,
-            token: token,
-        });
+        return res.redirect(`milove://auth/login?token=${token}`);
     }
     catch (error) {
         console.error("Error during Google OAuth:", ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
