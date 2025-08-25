@@ -27,7 +27,7 @@ router.post("/login", login);
 router.put("/reset-password", resetPassword);
 // router.put("/update", updateDetails);
 
-// Google Authentication
+// Google Authentication sss
 router.get("/google", startGoogleAuth);
 router.get("/google/callback", googleCallback);
 

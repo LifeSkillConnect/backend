@@ -107,10 +107,7 @@ export const googleCallback = async (req: Request, res: Response) => {
       { expiresIn: "1h" }
     );
 
-    return res.status(200).json({
-      success: true,
-      token: token,
-    });
+return res.redirect(`milove://auth/login?token=${token}`);
   } catch (error: any) {
     console.error(
       "Error during Google OAuth:",
