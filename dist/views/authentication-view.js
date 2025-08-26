@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.resetPassword = exports.login = exports.createAccount = exports.verifyOtp = exports.sendOtp = exports.validateEmail = exports.googleCallback = exports.startGoogleAuth = void 0;
+exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.resetPassword = exports.login = exports.createAccount = exports.verifyOtp = exports.sendOtp = exports.validateEmail = exports.verifyAppToken = exports.googleCallback = exports.startGoogleAuth = void 0;
 const client_1 = require("@prisma/client");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const yup = __importStar(require("yup"));
@@ -48,6 +48,7 @@ const prisma = new client_1.PrismaClient();
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI ||
+    // "https://backend-azure-chi.vercel.app/api/v1/auth/google/callback";
     "https://backend-azure-chi.vercel.app/api/v1/auth/google/callback";
 // Step 1: Redirect user to Google OAuth consent screen
 const startGoogleAuth = (req, res) => {
@@ -59,9 +60,10 @@ exports.startGoogleAuth = startGoogleAuth;
 const googleCallback = async (req, res) => {
     var _a;
     const code = req.query.code;
+    console.log(code, "CODEEE");
     if (!code) {
         console.error("No authorization code provided");
-        return res.redirect("/login");
+        return res.redirect("lifeskillconnect://account?success=false&error=no_code");
     }
     try {
         // Exchange authorization code for tokens
@@ -98,14 +100,78 @@ const googleCallback = async (req, res) => {
             });
         }
         const token = jsonwebtoken_1.default.sign({ userId: isPresent.id, email: isPresent.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
-        return res.redirect(`milove://auth/login?token=${token}`);
+        return res.redirect(`https://backend-azure-chi.vercel.app/api/v1/auth/google/callback/verify/${token}`);
     }
     catch (error) {
         console.error("Error during Google OAuth:", ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
-        res.redirect("/login");
+        return res.redirect(`lifeskillconnect://account?success=false&error=${encodeURIComponent(error.message)}`);
     }
 };
 exports.googleCallback = googleCallback;
+const verifyAppToken = async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log("TOKEN" + id);
+        if (!id) {
+            return res.status(400).json({ error: "Id is Required", success: false });
+        }
+        res.setHeader("Content-Type", "text/html");
+        return res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Redirecting…</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+    .card{max-width:520px;padding:24px;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,.07);text-align:center}
+    a{color:#2563eb;text-decoration:none}
+    .muted{color:#6b7280;font-size:14px;margin-top:10px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Redirecting…</h1>
+    <p>Please wait while we open the app.</p>
+    <p id="hint" class="muted" style="display:none">
+      If nothing happens, <a id="deeplink" href="lifeskillconnect://account?token=${encodeURIComponent(id)}">tap here to open LifeSkillConnect</a>.
+    </p>
+  </div>
+</body>
+  <script>
+    (function () {
+      var token = ${JSON.stringify(id)}; // already server-side sanitized
+      var target = "lifeskillconnect://account?token=" + encodeURIComponent(token);
+
+      // Try immediate redirect
+      function go() {
+        // replace() avoids adding this page to history
+        window.location.replace(target);
+      }
+
+      // Try JS redirect ASAP
+      go();
+
+      // As a safety net, try again shortly (helps on some Android browsers)
+      setTimeout(go, 2000);
+
+      // After a short delay, reveal the manual link for users
+      setTimeout(function () {
+        var hint = document.getElementById("hint");
+        if (hint) hint.style.display = "block";
+      }, 1200);
+    })();
+  </script>
+</html>`);
+    }
+    catch (error) {
+        console.log(error);
+        return res
+            .status(500)
+            .json({ error: "Internal Server Error", success: false });
+    }
+};
+exports.verifyAppToken = verifyAppToken;
 // Validate Email
 const validateEmail = async (req, res) => {
     const { email } = req.body;

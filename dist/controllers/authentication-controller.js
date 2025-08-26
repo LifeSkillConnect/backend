@@ -18,6 +18,7 @@ router.put("/reset-password", authentication_view_1.resetPassword);
 // Google Authentication Service
 router.get("/google", authentication_view_1.startGoogleAuth);
 router.get("/google/callback", authentication_view_1.googleCallback);
+router.get("/google/callback/verify/:id", authentication_view_1.verifyAppToken);
 // Add Modules to User
 router.get("/get-modules", authentication_view_1.fetchAllModules);
 router.post("/assign-modules", authentication_view_1.addModulesToUser);

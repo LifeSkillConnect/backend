@@ -7,10 +7,12 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const authentication_controller_1 = __importDefault(require("./controllers/authentication-controller"));
+const morgan_1 = __importDefault(require("morgan"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
+app.use((0, morgan_1.default)("tiny"));
 app.use(express_1.default.urlencoded({ extended: true }));
 // Root route
 app.get("/", (req, res) => {
@@ -31,4 +33,7 @@ app.use((err, _req, res, _next) => {
     console.error("Error:", err.message);
     res.status(500).json({ success: false, error: "Internal server error" });
 });
+// app.listen(3000, () => {
+//   console.log("Server has started on PORT" + 3000);
+// });
 exports.default = app; // ✅ export app for Vercel
