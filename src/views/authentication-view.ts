@@ -110,7 +110,7 @@ export const googleCallback = async (req: Request, res: Response) => {
     );
 
     return res.redirect(
-      `lifeskillconnect://account?success=true&token=${token}`
+      `https://backend-azure-chi.vercel.app/api/v1/auth/google/callback/verify/${token}`
     );
   } catch (error: any) {
     console.error(
@@ -122,6 +122,75 @@ export const googleCallback = async (req: Request, res: Response) => {
         error.message
       )}`
     );
+  }
+};
+
+export const verifyAppToken = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    console.log("TOKEN" + id);
+    if (!id) {
+      return res.status(400).json({ error: "Id is Required", success: false });
+    }
+
+    return res.send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Redirecting…</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Meta refresh fallback -->
+  <meta http-equiv="refresh" content="0;url=lifeskillconnect://account?token=${encodeURIComponent(
+    id
+  )}" />
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+    .card{max-width:520px;padding:24px;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,.07);text-align:center}
+    a{color:#2563eb;text-decoration:none}
+    .muted{color:#6b7280;font-size:14px;margin-top:10px}
+  </style>
+  <script>
+    (function () {
+      var token = ${JSON.stringify(id)}; // already server-side sanitized
+      var target = "lifeskillconnect://account?token=" + encodeURIComponent(token);
+
+      // Try immediate redirect
+      function go() {
+        // replace() avoids adding this page to history
+        window.location.replace(target);
+      }
+
+      // Try JS redirect ASAP
+      go();
+
+      // As a safety net, try again shortly (helps on some Android browsers)
+      setTimeout(go, 300);
+
+      // After a short delay, reveal the manual link for users
+      setTimeout(function () {
+        var hint = document.getElementById("hint");
+        if (hint) hint.style.display = "block";
+      }, 1200);
+    })();
+  </script>
+</head>
+<body>
+  <div class="card">
+    <h1>Redirecting…</h1>
+    <p>Please wait while we open the app.</p>
+    <p id="hint" class="muted" style="display:none">
+      If nothing happens, <a id="deeplink" href="lifeskillconnect://account?token=${encodeURIComponent(
+        id
+      )}">tap here to open LifeSkillConnect</a>.
+    </p>
+  </div>
+</body>
+</html>`);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(500)
+      .json({ error: "Internal Server Error", success: false });
   }
 };
 

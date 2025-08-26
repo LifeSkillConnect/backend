@@ -5,13 +5,14 @@ import {
   verifyOtp,
   createAccount,
   login,
-//   updateDetails,
+  //   updateDetails,
   startGoogleAuth,
   googleCallback,
   resetPassword,
   fetchAllModules,
   addModulesToUser,
   saveModule,
+  verifyAppToken,
 } from "../views/authentication-view";
 
 const router = express.Router();
@@ -30,12 +31,11 @@ router.put("/reset-password", resetPassword);
 // Google Authentication Service
 router.get("/google", startGoogleAuth);
 router.get("/google/callback", googleCallback);
+router.get("/google/callback/verify/:id", verifyAppToken);
 
 // Add Modules to User
 router.get("/get-modules", fetchAllModules);
 router.post("/assign-modules", addModulesToUser);
 router.post("/add-modules", saveModule);
-
-
 
 export default router;
