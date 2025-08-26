@@ -2,13 +2,14 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import authenticationController from "./controllers/authentication-controller";
-
+import morgan from "morgan";
 dotenv.config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(morgan("tiny"));
 app.use(express.urlencoded({ extended: true }));
 
 // Root route
@@ -41,5 +42,9 @@ app.use(
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 );
+
+// app.listen(3000, () => {
+//   console.log("Server has started on PORT" + 3000);
+// });
 
 export default app; // ✅ export app for Vercel

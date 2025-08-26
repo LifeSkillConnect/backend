@@ -26,6 +26,7 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI =
   process.env.GOOGLE_REDIRECT_URI ||
+  // "https://backend-azure-chi.vercel.app/api/v1/auth/google/callback";
   "https://backend-azure-chi.vercel.app/api/v1/auth/google/callback";
 
 // Step 1: Redirect user to Google OAuth consent screen
@@ -39,6 +40,8 @@ export const startGoogleAuth = (req: Request, res: Response) => {
 // Step 2: Handle Google's callback with "code"
 export const googleCallback = async (req: Request, res: Response) => {
   const code = req.query.code as string;
+
+  console.log(code, "CODEEE");
 
   if (!code) {
     console.error("No authorization code provided");
@@ -132,23 +135,31 @@ export const verifyAppToken = async (req: Request, res: Response) => {
     if (!id) {
       return res.status(400).json({ error: "Id is Required", success: false });
     }
-
-    return res.send(`<!doctype html>
+    res.setHeader("Content-Type", "text/html");
+    return res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Redirecting…</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Meta refresh fallback -->
-  <meta http-equiv="refresh" content="0;url=lifeskillconnect://account?token=${encodeURIComponent(
-    id
-  )}" />
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
     .card{max-width:520px;padding:24px;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,.07);text-align:center}
     a{color:#2563eb;text-decoration:none}
     .muted{color:#6b7280;font-size:14px;margin-top:10px}
   </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Redirecting…</h1>
+    <p>Please wait while we open the app.</p>
+    <p id="hint" class="muted" style="display:none">
+      If nothing happens, <a id="deeplink" href="lifeskillconnect://account?token=${encodeURIComponent(
+        id
+      )}">tap here to open LifeSkillConnect</a>.
+    </p>
+  </div>
+</body>
   <script>
     (function () {
       var token = ${JSON.stringify(id)}; // already server-side sanitized
@@ -164,7 +175,7 @@ export const verifyAppToken = async (req: Request, res: Response) => {
       go();
 
       // As a safety net, try again shortly (helps on some Android browsers)
-      setTimeout(go, 300);
+      setTimeout(go, 2000);
 
       // After a short delay, reveal the manual link for users
       setTimeout(function () {
@@ -173,18 +184,6 @@ export const verifyAppToken = async (req: Request, res: Response) => {
       }, 1200);
     })();
   </script>
-</head>
-<body>
-  <div class="card">
-    <h1>Redirecting…</h1>
-    <p>Please wait while we open the app.</p>
-    <p id="hint" class="muted" style="display:none">
-      If nothing happens, <a id="deeplink" href="lifeskillconnect://account?token=${encodeURIComponent(
-        id
-      )}">tap here to open LifeSkillConnect</a>.
-    </p>
-  </div>
-</body>
 </html>`);
   } catch (error) {
     console.log(error);
