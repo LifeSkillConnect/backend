@@ -43,7 +43,7 @@ export const googleCallback = async (req: Request, res: Response) => {
   if (!code) {
     console.error("No authorization code provided");
     return res.redirect(
-      "lifeskillconnect://auth/callback?success=false&error=no_code"
+      "lifeskillconnect://account?success=false&error=no_code"
     );
   }
 
@@ -110,7 +110,7 @@ export const googleCallback = async (req: Request, res: Response) => {
     );
 
     return res.redirect(
-      `lifeskillconnect://(account)/account?success=true&token=${token}`
+      `lifeskillconnect://account?success=true&token=${token}`
     );
   } catch (error: any) {
     console.error(
@@ -118,7 +118,7 @@ export const googleCallback = async (req: Request, res: Response) => {
       error?.response?.data || error.message
     );
     return res.redirect(
-      `lifeskillconnect://(account)/account?success=false&error=${encodeURIComponent(
+      `lifeskillconnect://account?success=false&error=${encodeURIComponent(
         error.message
       )}`
     );
