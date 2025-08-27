@@ -12,8 +12,11 @@ import {
   fetchAllModules,
   addModulesToUser,
   saveModule,
-  verifyAppToken,
+  getProfile,
+  verifyAppTokenSiginIn,
+  verifyAppTokenSiginUp,
 } from "../views/authentication-view";
+import { authenticate } from "../middleware/middleware";
 
 const router = express.Router();
 
@@ -26,12 +29,14 @@ router.post("/verify-otp", verifyOtp);
 router.post("/create-account", createAccount);
 router.post("/login", login);
 router.put("/reset-password", resetPassword);
+router.get("/profile", authenticate, getProfile);
 // router.put("/update", updateDetails);
 
 // Google Authentication Service
 router.get("/google", startGoogleAuth);
 router.get("/google/callback", googleCallback);
-router.get("/google/callback/verify/:id", verifyAppToken);
+router.get("/google/callback/verify/:id", verifyAppTokenSiginIn);
+router.get("/google/callback/verify-2/:id", verifyAppTokenSiginUp);
 
 // Add Modules to User
 router.get("/get-modules", fetchAllModules);
