@@ -16,7 +16,7 @@ router.post("/create-account", authentication_view_1.createAccount);
 router.post("/login", authentication_view_1.login);
 router.put("/reset-password", authentication_view_1.resetPassword);
 router.get("/profile", middleware_1.authenticate, authentication_view_1.getProfile);
-router.get("/finish", middleware_1.authenticate, authentication_view_1.finishSignup);
+router.post("/finish", middleware_1.authenticate, authentication_view_1.finishSignup);
 // router.put("/update", updateDetails);
 // Google Authentication Service
 router.get("/google", authentication_view_1.startGoogleAuth);
