@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetPasswordSchema = exports.updateUserSchema = exports.loginSchema = exports.createAccountSchema = void 0;
+exports.finishSignupSchema = exports.resetPasswordSchema = exports.updateUserSchema = exports.loginSchema = exports.createAccountSchema = void 0;
 const yup = __importStar(require("yup"));
 exports.createAccountSchema = yup.object({
     email: yup
@@ -92,9 +92,27 @@ exports.updateUserSchema = yup.object({
     profilePicture: yup.string().url("Invalid image URL").optional(),
 });
 exports.resetPasswordSchema = yup.object({
-    email: yup.string().email("Invalid email format").required("Email is required"),
+    email: yup
+        .string()
+        .email("Invalid email format")
+        .required("Email is required"),
     password: yup
         .string()
         .min(8, "Password must be at least 8 characters")
         .required("New password is required"),
+});
+exports.finishSignupSchema = yup.object({
+    dateOfBirth: yup
+        .date()
+        .max(new Date(), "Date of birth cannot be in the future")
+        .required("Date of birth is required"),
+    username: yup
+        .string()
+        .min(3, "Username must be at least 3 characters")
+        .required("Username is required"),
+    howdidyouhearaboutus: yup.string().nullable(), // optional
+    phoneNumber: yup
+        .string()
+        .matches(/^\+?[0-9]{7,15}$/, "Invalid phone number")
+        .required("Phone number is required"),
 });

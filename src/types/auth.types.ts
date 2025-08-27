@@ -12,6 +12,13 @@ export interface CreateAccountPayload {
   password: string;
   phoneNumber: string;
   fullName: string;
+  username: string;
+  dateOfBirth: Date;
+  howdidyouhearaboutus?: string;
+}
+export interface FinishSignUpPayload {
+  username: string;
+  phoneNumber: string;
   dateOfBirth: Date;
   howdidyouhearaboutus?: string;
 }

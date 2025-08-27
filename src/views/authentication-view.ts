@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import {
   AddModuleToUserPayLoad,
   CreateAccountPayload,
+  FinishSignUpPayload,
   GoogleUserProfile,
   ModulePayload,
   SendOtpPayload,
@@ -13,6 +14,7 @@ import * as yup from "yup";
 import { sendEmail } from "../utils/email.utils";
 import {
   createAccountSchema,
+  finishSignupSchema,
   loginSchema,
   resetPasswordSchema,
   updateUserSchema,
@@ -266,6 +268,68 @@ export const verifyAppTokenSiginUp = async (req: Request, res: Response) => {
   }
 };
 
+// Finishing Account Creation with ThirdParty
+export const finishSignup = async (req: any, res: Response) => {
+  try {
+    // ✅ Validate request body
+    await finishSignupSchema.validate(req.body, { abortEarly: false });
+
+    const { phoneNumber, username, dateOfBirth, howdidyouhearaboutus } =
+      req.body as FinishSignUpPayload;
+
+    // ✅ Get userId from decoded JWT (middleware attaches it to req.user)
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: "UserId is required",
+      });
+    }
+
+    // ✅ Check if user exists
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: `User not found with ID ${userId}`,
+      });
+    }
+
+    // ✅ Update user data
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { phoneNumber, dateOfBirth, username, howdidyouhearaboutus },
+    });
+
+    // ✅ Generate new token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "1h" }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Signup completed successfully",
+      token,
+    });
+  } catch (error) {
+    console.error("Error in finishSignup:", error);
+
+    if (error instanceof yup.ValidationError) {
+      return res.status(400).json({
+        success: false,
+        errors: error.errors,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
+};
+
 // Validate Email
 export const validateEmail = async (req: Request, res: Response) => {
   const { email } = req.body;
@@ -440,6 +504,7 @@ export const createAccount = async (req: Request, res: Response) => {
       password,
       dateOfBirth,
       fullName,
+      username,
       howdidyouhearaboutus,
       phoneNumber,
     }: CreateAccountPayload = req.body;
@@ -470,6 +535,7 @@ export const createAccount = async (req: Request, res: Response) => {
         fullname: fullName,
         isActive: true,
         role: "USER",
+        username: username,
         authProvider: "EMAIL",
         howdidyouhearaboutus,
         phoneNumber,
@@ -550,7 +616,7 @@ export const login = async (req: Request, res: Response) => {
 
 export const getProfile = async (req: any, res: Response) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     if (!userId || userId.trim() === "") {
       return res
         .status(401)

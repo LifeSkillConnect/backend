@@ -18,6 +18,7 @@ model User {
   id                   String    @id @default(cuid())
   email                String    @unique
   fullname             String
+  username             String?
   phoneNumber          String?
   password             String?
   authProvider         String    @default("EMAIL") // Possible values: EMAIL, GOOGLE, FACEBOOK, APPLE

@@ -15,6 +15,7 @@ import {
   getProfile,
   verifyAppTokenSiginIn,
   verifyAppTokenSiginUp,
+  finishSignup,
 } from "../views/authentication-view";
 import { authenticate } from "../middleware/middleware";
 
@@ -30,6 +31,7 @@ router.post("/create-account", createAccount);
 router.post("/login", login);
 router.put("/reset-password", resetPassword);
 router.get("/profile", authenticate, getProfile);
+router.get("/finish", authenticate, finishSignup);
 // router.put("/update", updateDetails);
 
 // Google Authentication Service

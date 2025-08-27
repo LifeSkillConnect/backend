@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.resetPassword = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.sendOtp = exports.validateEmail = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.googleCallback = exports.startGoogleAuth = void 0;
+exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.resetPassword = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.sendOtp = exports.validateEmail = exports.finishSignup = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.googleCallback = exports.startGoogleAuth = void 0;
 const client_1 = require("@prisma/client");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const yup = __importStar(require("yup"));
@@ -238,6 +238,57 @@ const verifyAppTokenSiginUp = async (req, res) => {
     }
 };
 exports.verifyAppTokenSiginUp = verifyAppTokenSiginUp;
+// Finishing Account Creation with ThirdParty
+const finishSignup = async (req, res) => {
+    var _a;
+    try {
+        // ✅ Validate request body
+        await auth_schema_1.finishSignupSchema.validate(req.body, { abortEarly: false });
+        const { phoneNumber, username, dateOfBirth, howdidyouhearaboutus } = req.body;
+        // ✅ Get userId from decoded JWT (middleware attaches it to req.user)
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                error: "UserId is required",
+            });
+        }
+        // ✅ Check if user exists
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: `User not found with ID ${userId}`,
+            });
+        }
+        // ✅ Update user data
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { phoneNumber, dateOfBirth, username, howdidyouhearaboutus },
+        });
+        // ✅ Generate new token
+        const token = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        return res.status(200).json({
+            success: true,
+            message: "Signup completed successfully",
+            token,
+        });
+    }
+    catch (error) {
+        console.error("Error in finishSignup:", error);
+        if (error instanceof yup.ValidationError) {
+            return res.status(400).json({
+                success: false,
+                errors: error.errors,
+            });
+        }
+        return res.status(500).json({
+            success: false,
+            error: "Internal Server Error",
+        });
+    }
+};
+exports.finishSignup = finishSignup;
 // Validate Email
 const validateEmail = async (req, res) => {
     const { email } = req.body;
@@ -382,7 +433,7 @@ exports.verifyOtp = verifyOtp;
 const createAccount = async (req, res) => {
     try {
         await auth_schema_1.createAccountSchema.validate(req.body, { abortEarly: false });
-        const { email, password, dateOfBirth, fullName, howdidyouhearaboutus, phoneNumber, } = req.body;
+        const { email, password, dateOfBirth, fullName, username, howdidyouhearaboutus, phoneNumber, } = req.body;
         // Your account creation logic here
         // e.g., save to database, hash password, etc.
         const isPresent = await prisma.user.findUnique({
@@ -405,6 +456,7 @@ const createAccount = async (req, res) => {
                 fullname: fullName,
                 isActive: true,
                 role: "USER",
+                username: username,
                 authProvider: "EMAIL",
                 howdidyouhearaboutus,
                 phoneNumber,
@@ -470,7 +522,7 @@ const login = async (req, res) => {
 exports.login = login;
 const getProfile = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.userId;
         if (!userId || userId.trim() === "") {
             return res
                 .status(401)

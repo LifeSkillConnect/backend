@@ -60,9 +60,28 @@ export const updateUserSchema = yup.object({
 });
 
 export const resetPasswordSchema = yup.object({
-  email: yup.string().email("Invalid email format").required("Email is required"),
+  email: yup
+    .string()
+    .email("Invalid email format")
+    .required("Email is required"),
   password: yup
     .string()
     .min(8, "Password must be at least 8 characters")
     .required("New password is required"),
+});
+
+export const finishSignupSchema = yup.object({
+  dateOfBirth: yup
+    .date()
+    .max(new Date(), "Date of birth cannot be in the future")
+    .required("Date of birth is required"),
+  username: yup
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .required("Username is required"),
+  howdidyouhearaboutus: yup.string().nullable(), // optional
+  phoneNumber: yup
+    .string()
+    .matches(/^\+?[0-9]{7,15}$/, "Invalid phone number")
+    .required("Phone number is required"),
 });
