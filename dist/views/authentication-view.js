@@ -63,7 +63,7 @@ const googleCallback = async (req, res) => {
     console.log(code, "CODEEE");
     if (!code) {
         console.error("No authorization code provided");
-        return res.redirect("lifeskillsconnect://account?success=false&error=no_code");
+        return res.redirect("lifeskillsconnect://authentication?success=false&error=no_code");
     }
     try {
         // Exchange authorization code for tokens
@@ -104,7 +104,7 @@ const googleCallback = async (req, res) => {
     }
     catch (error) {
         console.error("Error during Google OAuth:", ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
-        return res.redirect(`lifeskillsconnect://account?success=false&error=${encodeURIComponent(error.message)}`);
+        return res.redirect(`lifeskillsconnect://authentication?success=false&error=${encodeURIComponent(error.message)}`);
     }
 };
 exports.googleCallback = googleCallback;
@@ -134,14 +134,14 @@ const verifyAppToken = async (req, res) => {
     <h1>Redirecting…</h1>
     <p>Please wait while we open the app.</p>
     <p id="hint" class="muted" style="display:none">
-      If nothing happens, <a id="deeplink" href="lifeskillsconnect://account?token=${encodeURIComponent(id)}">tap here to open lifeskillsconnect</a>.
+      If nothing happens, <a id="deeplink" href="lifeskillsconnect://authentication?token=${encodeURIComponent(id)}">tap here to open lifeskillsconnect</a>.
     </p>
   </div>
 </body>
   <script>
     (function () {
       var token = ${JSON.stringify(id)}; // already server-side sanitized
-      var target = "lifeskillsconnect://account?token=" + encodeURIComponent(token);
+      var target = "lifeskillsconnect://authentication?token=" + encodeURIComponent(token);
 
       // Try immediate redirect
       function go() {
