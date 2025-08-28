@@ -22,7 +22,7 @@ import {
 import axios from "axios";
 import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
+export const prisma = new PrismaClient();
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -579,20 +579,25 @@ export const login = async (req: Request, res: Response) => {
     // ✅ Check if user exists
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(404).json({ message: "Account not found" });
+      return res
+        .status(404)
+        .json({ message: "Incorrect ID", success: false });
     }
 
     // ✅ Prevent password login for Google/Apple accounts
     if (user.authProvider === "GOOGLE" || user.authProvider === "APPLE") {
       return res.status(400).json({
         message: `This account was created using ${user.authProvider}. Please log in with ${user.authProvider} instead.`,
+        success: false,
       });
     }
 
     // ✅ Compare passwords
     const isMatch = await bcrypt.compare(password, user.password || "");
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid email or password" });
+      return res
+        .status(400)
+        .json({ message: "Invalid password", success: false });
     }
 
     const token = jwt.sign(
@@ -607,10 +612,10 @@ export const login = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     if (error.name === "ValidationError") {
-      return res.status(400).json({ errors: error.errors });
+      return res.status(400).json({ errors: error.errors,success : false });
     }
     console.error("Login error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Internal server error",success : false });
   }
 };
 
