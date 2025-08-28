@@ -406,12 +406,12 @@ const verifyOtp = async (req, res) => {
                 .status(400)
                 .json({ success: false, error: "Invalid or expired OTP" });
         }
-        // OPTIONAL: check for expiration (e.g., OTP older than 10 mins)
-        const expirationTime = 10 * 60 * 1000; // 10 minutes
-        const createdAt = new Date(foundOtp.createdAt).getTime();
-        if (Date.now() - createdAt > expirationTime) {
-            return res.status(410).json({ success: false, error: "OTP expired" });
-        }
+        // // OPTIONAL: check for expiration (e.g., OTP older than 10 mins)
+        // const expirationTime = 10 * 60 * 1000; // 10 minutes
+        // const createdAt = new Date(foundOtp.createdAt).getTime();
+        // if (Date.now() - createdAt > expirationTime) {
+        //   return res.status(410).json({ success: false, error: "OTP expired" });
+        // }
         // Mark as used
         await prisma.otp.update({
             where: { id: foundOtp.id },
