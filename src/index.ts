@@ -43,8 +43,8 @@ app.use(
   }
 );
 
-app.listen(3000, () => {
-  console.log("Server has started on PORT" + 3000);
-});
+// app.listen(3000, () => {
+//   console.log("Server has started on PORT" + 3000);
+// });
 
 export default app; // ✅ export app for Vercel
