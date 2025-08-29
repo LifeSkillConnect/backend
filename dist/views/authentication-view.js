@@ -527,16 +527,14 @@ const login = async (req, res) => {
 exports.login = login;
 const getProfile = async (req, res) => {
     try {
-        const userId = req.user.userId;
-        if (!userId || userId.trim() === "") {
+        const userId = req.userId; // 👈 use what middleware actually sets
+        if (!userId) {
             return res
                 .status(401)
                 .json({ error: "User is not logged in", success: false });
         }
         const user = await exports.prisma.user.findUnique({
-            where: {
-                id: userId,
-            },
+            where: { id: userId },
         });
         if (!user) {
             return res.status(400).json({ error: "Invalid User", success: false });

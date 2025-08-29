@@ -621,17 +621,16 @@ export const login = async (req: Request, res: Response) => {
 
 export const getProfile = async (req: any, res: Response) => {
   try {
-    const userId = req.user.userId;
-    if (!userId || userId.trim() === "") {
+    const userId = req.userId; // 👈 use what middleware actually sets
+
+    if (!userId) {
       return res
         .status(401)
         .json({ error: "User is not logged in", success: false });
     }
 
     const user = await prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
+      where: { id: userId },
     });
 
     if (!user) {
@@ -647,6 +646,7 @@ export const getProfile = async (req: any, res: Response) => {
     res.status(500).json({ message: "Internal server error", success: false });
   }
 };
+
 
 // export const updateDetails = async (req: Request, res: Response) => {
 //   try {
