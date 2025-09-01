@@ -240,13 +240,12 @@ const verifyAppTokenSiginUp = async (req, res) => {
 exports.verifyAppTokenSiginUp = verifyAppTokenSiginUp;
 // Finishing Account Creation with ThirdParty
 const finishSignup = async (req, res) => {
-    var _a;
     try {
         // ✅ Validate request body
         await auth_schema_1.finishSignupSchema.validate(req.body, { abortEarly: false });
         const { phoneNumber, username, dateOfBirth, howdidyouhearaboutus } = req.body;
         // ✅ Get userId from decoded JWT (middleware attaches it to req.user)
-        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
+        const userId = req.userId; // 👈 use what middleware actually sets
         if (!userId) {
             return res.status(400).json({
                 success: false,

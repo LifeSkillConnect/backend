@@ -278,7 +278,7 @@ export const finishSignup = async (req: any, res: Response) => {
       req.body as FinishSignUpPayload;
 
     // ✅ Get userId from decoded JWT (middleware attaches it to req.user)
-    const userId = req.user?.userId;
+    const userId = req.userId; // 👈 use what middleware actually sets
     if (!userId) {
       return res.status(400).json({
         success: false,
