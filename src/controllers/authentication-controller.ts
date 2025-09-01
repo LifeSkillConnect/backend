@@ -157,7 +157,7 @@ router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
 
 // ---------------- Account Routes ----------------
-router.post("/register", createAccount);
+router.post("/create-account", createAccount);
 router.post("/login", login);
 router.put("/reset-password", resetPassword);
 router.get("/profile", authenticate, getProfile);

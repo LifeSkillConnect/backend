@@ -100,7 +100,7 @@ router.post("/validate-email", authentication_view_1.validateEmail);
 router.post("/send-otp", authentication_view_1.sendOtp);
 router.post("/verify-otp", authentication_view_1.verifyOtp);
 // ---------------- Account Routes ----------------
-router.post("/register", authentication_view_1.createAccount);
+router.post("/create-account", authentication_view_1.createAccount);
 router.post("/login", authentication_view_1.login);
 router.put("/reset-password", authentication_view_1.resetPassword);
 router.get("/profile", middleware_1.authenticate, authentication_view_1.getProfile);
