@@ -200,14 +200,14 @@ const verifyAppTokenSiginUp = async (req, res) => {
     <h1>Redirecting…</h1>
     <p>Please wait while we open the app.</p>
     <p id="hint" class="muted" style="display:none">
-      If nothing happens, <a id="deeplink" href="lifeskillsconnect://google?token=${encodeURIComponent(id)}">tap here to open lifeskillsconnect</a>.
+      If nothing happens, <a id="deeplink" href="lifeskillsconnect://auth/google-auth?token=${encodeURIComponent(id)}">tap here to open lifeskillsconnect</a>.
     </p>
   </div>
 </body>
   <script>
     (function () {
       var token = ${JSON.stringify(id)}; // already server-side sanitized
-      var target = "lifeskillsconnect://google?token=" + encodeURIComponent(token);
+      var target = "lifeskillsconnect://auth/google-auth?token=" + encodeURIComponent(token);
 
       // Try immediate redirect
       function go() {

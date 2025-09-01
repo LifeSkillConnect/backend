@@ -229,7 +229,7 @@ export const verifyAppTokenSiginUp = async (req: Request, res: Response) => {
     <h1>Redirecting…</h1>
     <p>Please wait while we open the app.</p>
     <p id="hint" class="muted" style="display:none">
-      If nothing happens, <a id="deeplink" href="lifeskillsconnect://google?token=${encodeURIComponent(
+      If nothing happens, <a id="deeplink" href="lifeskillsconnect://auth/google-auth?token=${encodeURIComponent(
         id
       )}">tap here to open lifeskillsconnect</a>.
     </p>
@@ -238,7 +238,7 @@ export const verifyAppTokenSiginUp = async (req: Request, res: Response) => {
   <script>
     (function () {
       var token = ${JSON.stringify(id)}; // already server-side sanitized
-      var target = "lifeskillsconnect://google?token=" + encodeURIComponent(token);
+      var target = "lifeskillsconnect://auth/google-auth?token=" + encodeURIComponent(token);
 
       // Try immediate redirect
       function go() {
