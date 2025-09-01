@@ -111,7 +111,7 @@ router.get("/google/callback", authentication_view_1.googleCallback);
 router.get("/google/callback/verify/:id", authentication_view_1.verifyAppTokenSiginIn);
 router.get("/google/callback/verify-2/:id", authentication_view_1.verifyAppTokenSiginUp);
 // ---------------- Modules Routes ----------------
-router.get("/modules", authentication_view_1.fetchAllModules);
-router.post("/modules/assign", authentication_view_1.addModulesToUser);
-router.post("/modules/add", authentication_view_1.saveModule);
+router.get("/get-modules", authentication_view_1.fetchAllModules);
+router.post("/assign-modules", authentication_view_1.addModulesToUser);
+router.post("/add-modules", authentication_view_1.saveModule);
 exports.default = router;

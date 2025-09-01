@@ -170,8 +170,8 @@ router.get("/google/callback/verify/:id", verifyAppTokenSiginIn);
 router.get("/google/callback/verify-2/:id", verifyAppTokenSiginUp);
 
 // ---------------- Modules Routes ----------------
-router.get("/modules", fetchAllModules);
-router.post("/modules/assign", addModulesToUser);
-router.post("/modules/add", saveModule);
+router.get("/get-modules", fetchAllModules);
+router.post("/assign-modules", addModulesToUser);
+router.post("/add-modules", saveModule);
 
 export default router;
