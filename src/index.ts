@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import authenticationController from "./controllers/authentication-controller";
 import morgan from "morgan";
 import { validateGoogleOAuthConfig, logOAuthConfig } from "./utils/config.utils";
+import { authenticate } from "./middleware/middleware";
 dotenv.config();
 
 const app = express();
@@ -27,6 +28,56 @@ app.get("/", (req, res) => {
 // Health check route
 app.get("/health", (_req, res) => {
   res.json({ status: "OK", message: "Server is running" });
+});
+
+// Test token generation endpoint
+app.get("/test-token", (_req, res) => {
+  const jwt = require('jsonwebtoken');
+  const testToken = jwt.sign(
+    { userId: "test-user-id", email: "test@example.com" },
+    process.env.JWT_SECRET || "your-super-secret-jwt-key",
+    { expiresIn: "1h" }
+  );
+  
+  res.json({
+    success: true,
+    token: testToken,
+    decoded: jwt.decode(testToken),
+    message: "Test token generated successfully"
+  });
+});
+
+// Test token verification endpoint
+app.get("/test-verify/:token", (req, res) => {
+  const jwt = require('jsonwebtoken');
+  const { token } = req.params;
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-super-secret-jwt-key");
+    res.json({
+      success: true,
+      decoded,
+      message: "Token verified successfully"
+    });
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      error: "Invalid token",
+      message: error.message
+    });
+  }
+});
+
+// Test protected endpoint (requires authentication)
+app.get("/test-protected", authenticate, (req: any, res) => {
+  res.json({
+    success: true,
+    message: "Protected endpoint accessed successfully",
+    user: {
+      userId: req.userId,
+      email: req.userEmail
+    }
+  });
 });
 
 // Routes
