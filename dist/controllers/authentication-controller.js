@@ -89,7 +89,8 @@ router.all("/apple/callback", passport_1.default.authenticate("apple", { failure
         return res.redirect("/api/auth/failure");
     }
     const token = jsonwebtoken_1.default.sign({ sub: user.id, email: user.email, provider: "apple" }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    const redirectUrl = `lifeskillconnect://account?token=${encodeURIComponent(token)}`;
+    const mobileAppScheme = process.env.MOBILE_APP_SCHEME || "lifeskillsconnect";
+    const redirectUrl = `${mobileAppScheme}://account?token=${encodeURIComponent(token)}`;
     res.redirect(redirectUrl);
 });
 router.get("/failure", (_req, res) => {

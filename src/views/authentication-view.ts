@@ -29,6 +29,7 @@ const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 const MOBILE_APP_SCHEME = "exp://192.168.1.67:8081/--/";
 console.log("MOBILE_APP_SCHEME:", MOBILE_APP_SCHEME);
+console.log("DEPLOYMENT TEST - This should show exp:// URLs");
 
 // Step 1: Redirect user to Google OAuth consent screen
 export const startGoogleAuth = (req: Request, res: Response) => {
