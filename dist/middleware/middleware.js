@@ -16,6 +16,7 @@ const authenticate = (req, res, next) => {
     try {
         const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
         req.userId = decoded.userId;
+        req.userEmail = decoded.email;
         next();
     }
     catch (error) {

@@ -59,7 +59,7 @@ app.get("/test-verify/:token", (req, res) => {
       decoded,
       message: "Token verified successfully"
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(401).json({
       success: false,
       error: "Invalid token",

@@ -50,6 +50,7 @@ const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 const MOBILE_APP_SCHEME = "exp://192.168.1.67:8081/--/";
 console.log("MOBILE_APP_SCHEME:", MOBILE_APP_SCHEME);
+console.log("DEPLOYMENT TEST - This should show exp:// URLs");
 // Step 1: Redirect user to Google OAuth consent screen
 const startGoogleAuth = (req, res) => {
     if (!CLIENT_ID || !REDIRECT_URI) {
@@ -110,9 +111,11 @@ const googleCallback = async (req, res) => {
                 },
             });
             const token = jsonwebtoken_1.default.sign({ userId: isPresent.id, email: isPresent.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+            console.log("Generated token for new user:", { userId: isPresent.id, email: isPresent.email });
             return res.redirect(`${process.env.GOOGLE_REDIRECT_URI}/verify-2/${token}`);
         }
         const token = jsonwebtoken_1.default.sign({ userId: isPresent.id, email: isPresent.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        console.log("Generated token for existing user:", { userId: isPresent.id, email: isPresent.email });
         return res.redirect(`${process.env.GOOGLE_REDIRECT_URI}/verify/${token}`);
     }
     catch (error) {
@@ -124,7 +127,8 @@ exports.googleCallback = googleCallback;
 const verifyAppTokenSiginIn = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log("TOKEN" + id);
+        console.log("TOKEN for sign-in:", id);
+        console.log("Token length:", id === null || id === void 0 ? void 0 : id.length);
         if (!id) {
             return res.status(400).json({ error: "Id is Required", success: false });
         }
@@ -188,7 +192,8 @@ exports.verifyAppTokenSiginIn = verifyAppTokenSiginIn;
 const verifyAppTokenSiginUp = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log("TOKEN" + id);
+        console.log("TOKEN for sign-up:", id);
+        console.log("Token length:", id === null || id === void 0 ? void 0 : id.length);
         if (!id) {
             return res.status(400).json({ error: "Id is Required", success: false });
         }
