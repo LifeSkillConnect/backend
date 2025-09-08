@@ -21,7 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Root route
 app.get("/", (req, res) => {
-  res.send("Hello from Express + Vercel + TypeScript! - Updated for OAuth fix");
+  res.send("Hello from Express + Vercel + TypeScript! - OAuth Expo URL Fix Applied");
 });
 
 // Health check route
