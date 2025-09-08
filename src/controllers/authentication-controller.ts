@@ -140,7 +140,8 @@ router.all(
       { expiresIn: "7d" }
     );
 
-    const redirectUrl = `lifeskillconnect://account?token=${encodeURIComponent(
+    const mobileAppScheme = process.env.MOBILE_APP_SCHEME || "lifeskillsconnect";
+    const redirectUrl = `${mobileAppScheme}://account?token=${encodeURIComponent(
       token
     )}`;
     res.redirect(redirectUrl);

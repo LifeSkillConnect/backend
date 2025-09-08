@@ -3,9 +3,16 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authenticationController from "./controllers/authentication-controller";
 import morgan from "morgan";
+import { validateGoogleOAuthConfig, logOAuthConfig } from "./utils/config.utils";
 dotenv.config();
 
 const app = express();
+
+// Validate configuration on startup
+logOAuthConfig();
+if (!validateGoogleOAuthConfig()) {
+  console.warn('⚠️  Google OAuth configuration is incomplete. Some features may not work properly.');
+}
 
 app.use(cors());
 app.use(express.json());

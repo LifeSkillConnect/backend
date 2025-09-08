@@ -26,13 +26,19 @@ export const prisma = new PrismaClient();
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI =
-  process.env.GOOGLE_REDIRECT_URI ||
-  // "https://backend-azure-chi.vercel.app/api/v1/auth/google/callback";
-  "https://backend-azure-chi.vercel.app/api/v1/auth/google/callback";
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+const MOBILE_APP_SCHEME = process.env.MOBILE_APP_SCHEME || "exp://192.168.1.67:8081/--/";
 
 // Step 1: Redirect user to Google OAuth consent screen
 export const startGoogleAuth = (req: Request, res: Response) => {
+  if (!CLIENT_ID || !REDIRECT_URI) {
+    console.error("Missing Google OAuth configuration");
+    return res.status(500).json({
+      success: false,
+      error: "Google OAuth not properly configured"
+    });
+  }
+
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
     REDIRECT_URI
   )}&response_type=code&scope=profile email&access_type=offline&prompt=consent`;
@@ -45,10 +51,17 @@ export const googleCallback = async (req: Request, res: Response) => {
 
   console.log(code, "CODEEE");
 
+  if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
+    console.error("Missing Google OAuth configuration in callback");
+    return res.redirect(
+      `${MOBILE_APP_SCHEME}?success=false&error=oauth_config_missing`
+    );
+  }
+
   if (!code) {
     console.error("No authorization code provided");
     return res.redirect(
-      "lifeskillsconnect://authentication?success=false&error=no_code"
+      `${MOBILE_APP_SCHEME}?success=false&error=no_code`
     );
   }
 
@@ -112,7 +125,7 @@ export const googleCallback = async (req: Request, res: Response) => {
         { expiresIn: "1h" }
       );
       return res.redirect(
-        `https://backend-azure-chi.vercel.app/api/v1/auth/google/callback/verify-2/${token}?`
+        `${process.env.GOOGLE_REDIRECT_URI}/verify-2/${token}`
       );
     }
 
@@ -123,7 +136,7 @@ export const googleCallback = async (req: Request, res: Response) => {
     );
 
     return res.redirect(
-      `https://backend-azure-chi.vercel.app/api/v1/auth/google/callback/verify/${token}?`
+      `${process.env.GOOGLE_REDIRECT_URI}/verify/${token}`
     );
   } catch (error: any) {
     console.error(
@@ -131,7 +144,7 @@ export const googleCallback = async (req: Request, res: Response) => {
       error?.response?.data || error.message
     );
     return res.redirect(
-      `lifeskillsconnect://authentication?success=false&error=${encodeURIComponent(
+      `${MOBILE_APP_SCHEME}?success=false&error=${encodeURIComponent(
         error.message
       )}`
     );
@@ -164,7 +177,7 @@ export const verifyAppTokenSiginIn = async (req: Request, res: Response) => {
     <h1>Redirecting…</h1>
     <p>Please wait while we open the app.</p>
     <p id="hint" class="muted" style="display:none">
-      If nothing happens, <a id="deeplink" href="lifeskillsconnect://authentication?token=${encodeURIComponent(
+      If nothing happens, <a id="deeplink" href="${MOBILE_APP_SCHEME}?token=${encodeURIComponent(
         id
       )}">tap here to open lifeskillsconnect</a>.
     </p>
@@ -173,7 +186,7 @@ export const verifyAppTokenSiginIn = async (req: Request, res: Response) => {
   <script>
     (function () {
       var token = ${JSON.stringify(id)}; // already server-side sanitized
-      var target = "lifeskillsconnect://authentication?token=" + encodeURIComponent(token);
+      var target = "${MOBILE_APP_SCHEME}?token=" + encodeURIComponent(token);
 
       // Try immediate redirect
       function go() {
@@ -229,7 +242,7 @@ export const verifyAppTokenSiginUp = async (req: Request, res: Response) => {
     <h1>Redirecting…</h1>
     <p>Please wait while we open the app.</p>
     <p id="hint" class="muted" style="display:none">
-      If nothing happens, <a id="deeplink" href="lifeskillsconnect://auth/google-auth?token=${encodeURIComponent(
+      If nothing happens, <a id="deeplink" href="${MOBILE_APP_SCHEME}?token=${encodeURIComponent(
         id
       )}">tap here to open lifeskillsconnect</a>.
     </p>
@@ -238,7 +251,7 @@ export const verifyAppTokenSiginUp = async (req: Request, res: Response) => {
   <script>
     (function () {
       var token = ${JSON.stringify(id)}; // already server-side sanitized
-      var target = "lifeskillsconnect://auth/google-auth?token=" + encodeURIComponent(token);
+      var target = "${MOBILE_APP_SCHEME}?token=" + encodeURIComponent(token);
 
       // Try immediate redirect
       function go() {
