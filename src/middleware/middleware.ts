@@ -18,8 +18,9 @@ export const authenticate = (
   const token = authHeader.split(" ")[1];
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string, email: string };
     (req as any).userId = decoded.userId;
+    (req as any).userEmail = decoded.email;
     next();
   } catch (error) {
     res.status(401).json({ error: "Invalid token" });

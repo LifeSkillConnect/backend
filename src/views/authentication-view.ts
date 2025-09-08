@@ -126,6 +126,7 @@ export const googleCallback = async (req: Request, res: Response) => {
         process.env.JWT_SECRET as string,
         { expiresIn: "1h" }
       );
+      console.log("Generated token for new user:", { userId: isPresent.id, email: isPresent.email });
       return res.redirect(
         `${process.env.GOOGLE_REDIRECT_URI}/verify-2/${token}`
       );
@@ -136,6 +137,7 @@ export const googleCallback = async (req: Request, res: Response) => {
       process.env.JWT_SECRET as string,
       { expiresIn: "1h" }
     );
+    console.log("Generated token for existing user:", { userId: isPresent.id, email: isPresent.email });
 
     return res.redirect(
       `${process.env.GOOGLE_REDIRECT_URI}/verify/${token}`
@@ -156,7 +158,8 @@ export const googleCallback = async (req: Request, res: Response) => {
 export const verifyAppTokenSiginIn = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    console.log("TOKEN" + id);
+    console.log("TOKEN for sign-in:", id);
+    console.log("Token length:", id?.length);
     if (!id) {
       return res.status(400).json({ error: "Id is Required", success: false });
     }
@@ -221,7 +224,8 @@ export const verifyAppTokenSiginIn = async (req: Request, res: Response) => {
 export const verifyAppTokenSiginUp = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    console.log("TOKEN" + id);
+    console.log("TOKEN for sign-up:", id);
+    console.log("Token length:", id?.length);
     if (!id) {
       return res.status(400).json({ error: "Id is Required", success: false });
     }
