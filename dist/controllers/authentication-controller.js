@@ -10,6 +10,7 @@ const passport_1 = __importDefault(require("passport"));
 const passport_apple_1 = __importDefault(require("passport-apple"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const authentication_view_1 = require("../views/authentication-view");
+const supabase_auth_view_1 = require("../views/supabase-auth-view");
 const middleware_1 = require("../middleware/middleware");
 const router = express_1.default.Router();
 // ---------------- Session Config ----------------
@@ -106,11 +107,15 @@ router.post("/login", authentication_view_1.login);
 router.put("/reset-password", authentication_view_1.resetPassword);
 router.get("/profile", middleware_1.authenticate, authentication_view_1.getProfile);
 router.post("/finish-signup", middleware_1.authenticate, authentication_view_1.finishSignup);
-// ---------------- Google Auth Routes ----------------
-router.get("/google", authentication_view_1.startGoogleAuth);
-router.get("/google/callback", authentication_view_1.googleCallback);
+// ---------------- Google Auth Routes (Supabase) ----------------
+router.get("/google", supabase_auth_view_1.startGoogleAuth);
+router.get("/google/callback", supabase_auth_view_1.googleCallback);
 router.get("/google/callback/verify/:id", authentication_view_1.verifyAppTokenSiginIn);
 router.get("/google/callback/verify-2/:id", authentication_view_1.verifyAppTokenSiginUp);
+// ---------------- Supabase Auth Routes ----------------
+router.post("/verify-token", supabase_auth_view_1.verifySupabaseToken);
+router.post("/signout", supabase_auth_view_1.signOut);
+router.get("/me", supabase_auth_view_1.getCurrentUser);
 // ---------------- Modules Routes ----------------
 router.get("/get-modules", authentication_view_1.fetchAllModules);
 router.post("/assign-modules", authentication_view_1.addModulesToUser);

@@ -20,9 +20,14 @@ import {
   verifyAppTokenSiginUp,
   finishSignup,
   prisma,
+} from "../views/authentication-view";
+import {
   startGoogleAuth,
   googleCallback,
-} from "../views/authentication-view";
+  verifySupabaseToken,
+  signOut,
+  getCurrentUser,
+} from "../views/supabase-auth-view";
 import { authenticate } from "../middleware/middleware";
 
 const router = express.Router();
@@ -164,11 +169,16 @@ router.put("/reset-password", resetPassword);
 router.get("/profile", authenticate, getProfile);
 router.post("/finish-signup", authenticate, finishSignup);
 
-// ---------------- Google Auth Routes ----------------
+// ---------------- Google Auth Routes (Supabase) ----------------
 router.get("/google", startGoogleAuth);
 router.get("/google/callback", googleCallback);
 router.get("/google/callback/verify/:id", verifyAppTokenSiginIn);
 router.get("/google/callback/verify-2/:id", verifyAppTokenSiginUp);
+
+// ---------------- Supabase Auth Routes ----------------
+router.post("/verify-token", verifySupabaseToken);
+router.post("/signout", signOut);
+router.get("/me", getCurrentUser);
 
 // ---------------- Modules Routes ----------------
 router.get("/get-modules", fetchAllModules);
