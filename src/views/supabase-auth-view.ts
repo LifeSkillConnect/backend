@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../config/supabase';
-import { syncSupabaseUserToPrisma, getPrismaUserBySupabaseId } from '../services/user-sync.service';
+import { db } from '../services/supabase-database.service';
 import jwt from 'jsonwebtoken';
 
 const MOBILE_APP_SCHEME = process.env.MOBILE_APP_SCHEME || "lifeskillsconnect://";
@@ -47,10 +47,6 @@ export const startGoogleAuth = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Handle Google OAuth callback from Supabase
- * This is called after the user completes OAuth on Supabase
- */
 export const googleCallback = async (req: Request, res: Response) => {
   try {
     const { code, error } = req.query;
@@ -69,7 +65,6 @@ export const googleCallback = async (req: Request, res: Response) => {
       );
     }
 
-    // Exchange the code for a session
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code as string);
 
     if (exchangeError || !data.session || !data.user) {
@@ -79,14 +74,38 @@ export const googleCallback = async (req: Request, res: Response) => {
       );
     }
 
-    // Sync user to Prisma database
-    const syncedUser = await syncSupabaseUserToPrisma(data.user);
+    const email = data.user.email!;
+    const fullname = data.user.user_metadata?.full_name || 
+                    data.user.user_metadata?.name || 
+                    `${data.user.user_metadata?.given_name || ''} ${data.user.user_metadata?.family_name || ''}`.trim() ||
+                    'User';
+    const profilePicture = data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || null;
+    const authProvider = (data.user.app_metadata?.provider || 'GOOGLE').toUpperCase() as 'GOOGLE' | 'APPLE' | 'EMAIL';
 
-    // Generate your own JWT token for your app
+    let user = await db.user.findUnique({ email });
+
+    if (!user) {
+      user = await db.user.create({
+        email,
+        fullname,
+        profile_picture: profilePicture || undefined,
+        auth_provider: authProvider,
+        is_active: true,
+        role: 'USER',
+      });
+    } else {
+      user = await db.user.update(user.id, {
+        fullname,
+        profile_picture: profilePicture || undefined,
+        auth_provider: authProvider,
+        is_active: true,
+      });
+    }
+
     const token = jwt.sign(
       { 
-        userId: syncedUser.id, 
-        email: syncedUser.email,
+        userId: user.id, 
+        email: user.email,
         supabaseUserId: data.user.id,
         provider: 'google'
       },
@@ -94,19 +113,12 @@ export const googleCallback = async (req: Request, res: Response) => {
       { expiresIn: '7d' }
     );
 
-    console.log('Generated token for user:', { userId: syncedUser.id, email: syncedUser.email });
-
-    // Check if this is a new user (no additional profile data)
-    const isNewUser = !syncedUser.username || !syncedUser.phoneNumber;
+    const isNewUser = !user.username || !user.phone_number;
 
     if (isNewUser) {
-      return res.redirect(
-        `${process.env.GOOGLE_REDIRECT_URI}/verify-2/${token}`
-      );
+      return res.redirect(`${process.env.GOOGLE_REDIRECT_URI}/verify-2/${token}`);
     } else {
-      return res.redirect(
-        `${process.env.GOOGLE_REDIRECT_URI}/verify/${token}`
-      );
+      return res.redirect(`${process.env.GOOGLE_REDIRECT_URI}/verify/${token}`);
     }
   } catch (error) {
     console.error('Error in Google OAuth callback:', error);
@@ -118,10 +130,6 @@ export const googleCallback = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Verify Supabase JWT token and return user data
- * This can be used to verify tokens from your mobile app
- */
 export const verifySupabaseToken = async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
@@ -134,8 +142,6 @@ export const verifySupabaseToken = async (req: Request, res: Response) => {
     }
 
     const token = authHeader.substring(7);
-    
-    // Verify the token with Supabase
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !user) {
@@ -145,10 +151,9 @@ export const verifySupabaseToken = async (req: Request, res: Response) => {
       });
     }
 
-    // Get user data from Prisma
-    const prismaUser = await getPrismaUserBySupabaseId(user.id);
+    const dbUser = await db.user.findUnique({ email: user.email! });
 
-    if (!prismaUser) {
+    if (!dbUser) {
       return res.status(404).json({
         success: false,
         error: 'User not found in database'
@@ -157,7 +162,21 @@ export const verifySupabaseToken = async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      user: prismaUser
+      user: {
+        id: dbUser.id,
+        email: dbUser.email,
+        fullname: dbUser.fullname,
+        username: dbUser.username,
+        phone_number: dbUser.phone_number,
+        auth_provider: dbUser.auth_provider,
+        role: dbUser.role,
+        is_active: dbUser.is_active,
+        date_of_birth: dbUser.date_of_birth,
+        profile_picture: dbUser.profile_picture,
+        howdidyouhearaboutus: dbUser.howdidyouhearaboutus,
+        created_at: dbUser.created_at,
+        updated_at: dbUser.updated_at,
+      }
     });
   } catch (error) {
     console.error('Error verifying Supabase token:', error);
@@ -168,77 +187,58 @@ export const verifySupabaseToken = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Sign out user from Supabase
- */
 export const signOut = async (req: Request, res: Response) => {
   try {
     const { error } = await supabase.auth.signOut();
-    
     if (error) {
       console.error('Error signing out:', error);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to sign out'
-      });
+      return res.status(500).json({ success: false, error: 'Failed to sign out' });
     }
-
-    res.json({
-      success: true,
-      message: 'Signed out successfully'
-    });
+    res.json({ success: true, message: 'Signed out successfully' });
   } catch (error) {
     console.error('Error in sign out:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-/**
- * Get current user session
- */
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
-    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        error: 'No valid authorization header'
-      });
+      return res.status(401).json({ success: false, error: 'No valid authorization header' });
     }
 
     const token = authHeader.substring(7);
-    
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-
     if (error || !user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid token'
-      });
+      return res.status(401).json({ success: false, error: 'Invalid token' });
     }
 
-    const prismaUser = await getPrismaUserBySupabaseId(user.id);
-
-    if (!prismaUser) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found in database'
-      });
+    const dbUser = await db.user.findUnique({ email: user.email! });
+    if (!dbUser) {
+      return res.status(404).json({ success: false, error: 'User not found in database' });
     }
 
     res.json({
       success: true,
-      user: prismaUser
+      user: {
+        id: dbUser.id,
+        email: dbUser.email,
+        fullname: dbUser.fullname,
+        username: dbUser.username,
+        phone_number: dbUser.phone_number,
+        auth_provider: dbUser.auth_provider,
+        role: dbUser.role,
+        is_active: dbUser.is_active,
+        date_of_birth: dbUser.date_of_birth,
+        profile_picture: dbUser.profile_picture,
+        howdidyouhearaboutus: dbUser.howdidyouhearaboutus,
+        created_at: dbUser.created_at,
+        updated_at: dbUser.updated_at,
+      }
     });
   } catch (error) {
     console.error('Error getting current user:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

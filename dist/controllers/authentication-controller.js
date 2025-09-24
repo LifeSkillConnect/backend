@@ -12,6 +12,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const authentication_view_1 = require("../views/authentication-view");
 const supabase_auth_view_1 = require("../views/supabase-auth-view");
 const middleware_1 = require("../middleware/middleware");
+const supabase_database_service_1 = require("../services/supabase-database.service");
 const router = express_1.default.Router();
 // ---------------- Session Config ----------------
 router.use((0, express_session_1.default)({
@@ -32,7 +33,7 @@ passport_1.default.serializeUser((user, done) => {
 });
 passport_1.default.deserializeUser(async (id, done) => {
     try {
-        const user = await authentication_view_1.prisma.user.findUnique({ where: { id } });
+        const user = await supabase_database_service_1.db.user.findById(id);
         done(null, user);
     }
     catch (err) {
@@ -62,16 +63,12 @@ passport_1.default.use(new passport_apple_1.default({
         if (!safeEmail) {
             return done(new Error("No valid email found from Apple"));
         }
-        let user = await authentication_view_1.prisma.user.findUnique({
-            where: { email: safeEmail },
-        });
+        let user = await supabase_database_service_1.db.user.findUnique({ email: safeEmail });
         if (!user) {
-            user = await authentication_view_1.prisma.user.create({
-                data: {
-                    email: safeEmail,
-                    fullname: fullName || "Apple User",
-                    authProvider: "APPLE",
-                },
+            user = await supabase_database_service_1.db.user.create({
+                email: safeEmail,
+                fullname: fullName || "Apple User",
+                auth_provider: "APPLE",
             });
         }
         return done(null, user);

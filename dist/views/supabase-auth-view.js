@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCurrentUser = exports.signOut = exports.verifySupabaseToken = exports.googleCallback = exports.startGoogleAuth = void 0;
 const supabase_1 = require("../config/supabase");
-const user_sync_service_1 = require("../services/user-sync.service");
+const supabase_database_service_1 = require("../services/supabase-database.service");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const MOBILE_APP_SCHEME = process.env.MOBILE_APP_SCHEME || "lifeskillsconnect://";
 /**
@@ -50,11 +50,8 @@ const startGoogleAuth = async (req, res) => {
     }
 };
 exports.startGoogleAuth = startGoogleAuth;
-/**
- * Handle Google OAuth callback from Supabase
- * This is called after the user completes OAuth on Supabase
- */
 const googleCallback = async (req, res) => {
+    var _a, _b, _c, _d, _e, _f, _g;
     try {
         const { code, error } = req.query;
         if (error) {
@@ -65,24 +62,44 @@ const googleCallback = async (req, res) => {
             console.error('No authorization code provided');
             return res.redirect(`${MOBILE_APP_SCHEME}?success=false&error=no_code`);
         }
-        // Exchange the code for a session
         const { data, error: exchangeError } = await supabase_1.supabase.auth.exchangeCodeForSession(code);
         if (exchangeError || !data.session || !data.user) {
             console.error('Error exchanging code for session:', exchangeError);
             return res.redirect(`${MOBILE_APP_SCHEME}?success=false&error=session_exchange_failed`);
         }
-        // Sync user to Prisma database
-        const syncedUser = await (0, user_sync_service_1.syncSupabaseUserToPrisma)(data.user);
-        // Generate your own JWT token for your app
+        const email = data.user.email;
+        const fullname = ((_a = data.user.user_metadata) === null || _a === void 0 ? void 0 : _a.full_name) ||
+            ((_b = data.user.user_metadata) === null || _b === void 0 ? void 0 : _b.name) ||
+            `${((_c = data.user.user_metadata) === null || _c === void 0 ? void 0 : _c.given_name) || ''} ${((_d = data.user.user_metadata) === null || _d === void 0 ? void 0 : _d.family_name) || ''}`.trim() ||
+            'User';
+        const profilePicture = ((_e = data.user.user_metadata) === null || _e === void 0 ? void 0 : _e.avatar_url) || ((_f = data.user.user_metadata) === null || _f === void 0 ? void 0 : _f.picture) || null;
+        const authProvider = (((_g = data.user.app_metadata) === null || _g === void 0 ? void 0 : _g.provider) || 'GOOGLE').toUpperCase();
+        let user = await supabase_database_service_1.db.user.findUnique({ email });
+        if (!user) {
+            user = await supabase_database_service_1.db.user.create({
+                email,
+                fullname,
+                profile_picture: profilePicture || undefined,
+                auth_provider: authProvider,
+                is_active: true,
+                role: 'USER',
+            });
+        }
+        else {
+            user = await supabase_database_service_1.db.user.update(user.id, {
+                fullname,
+                profile_picture: profilePicture || undefined,
+                auth_provider: authProvider,
+                is_active: true,
+            });
+        }
         const token = jsonwebtoken_1.default.sign({
-            userId: syncedUser.id,
-            email: syncedUser.email,
+            userId: user.id,
+            email: user.email,
             supabaseUserId: data.user.id,
             provider: 'google'
         }, process.env.JWT_SECRET, { expiresIn: '7d' });
-        console.log('Generated token for user:', { userId: syncedUser.id, email: syncedUser.email });
-        // Check if this is a new user (no additional profile data)
-        const isNewUser = !syncedUser.username || !syncedUser.phoneNumber;
+        const isNewUser = !user.username || !user.phone_number;
         if (isNewUser) {
             return res.redirect(`${process.env.GOOGLE_REDIRECT_URI}/verify-2/${token}`);
         }
@@ -96,10 +113,6 @@ const googleCallback = async (req, res) => {
     }
 };
 exports.googleCallback = googleCallback;
-/**
- * Verify Supabase JWT token and return user data
- * This can be used to verify tokens from your mobile app
- */
 const verifySupabaseToken = async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
@@ -110,7 +123,6 @@ const verifySupabaseToken = async (req, res) => {
             });
         }
         const token = authHeader.substring(7);
-        // Verify the token with Supabase
         const { data: { user }, error } = await supabase_1.supabaseAdmin.auth.getUser(token);
         if (error || !user) {
             return res.status(401).json({
@@ -118,9 +130,8 @@ const verifySupabaseToken = async (req, res) => {
                 error: 'Invalid token'
             });
         }
-        // Get user data from Prisma
-        const prismaUser = await (0, user_sync_service_1.getPrismaUserBySupabaseId)(user.id);
-        if (!prismaUser) {
+        const dbUser = await supabase_database_service_1.db.user.findUnique({ email: user.email });
+        if (!dbUser) {
             return res.status(404).json({
                 success: false,
                 error: 'User not found in database'
@@ -128,7 +139,21 @@ const verifySupabaseToken = async (req, res) => {
         }
         res.json({
             success: true,
-            user: prismaUser
+            user: {
+                id: dbUser.id,
+                email: dbUser.email,
+                fullname: dbUser.fullname,
+                username: dbUser.username,
+                phone_number: dbUser.phone_number,
+                auth_provider: dbUser.auth_provider,
+                role: dbUser.role,
+                is_active: dbUser.is_active,
+                date_of_birth: dbUser.date_of_birth,
+                profile_picture: dbUser.profile_picture,
+                howdidyouhearaboutus: dbUser.howdidyouhearaboutus,
+                created_at: dbUser.created_at,
+                updated_at: dbUser.updated_at,
+            }
         });
     }
     catch (error) {
@@ -140,71 +165,58 @@ const verifySupabaseToken = async (req, res) => {
     }
 };
 exports.verifySupabaseToken = verifySupabaseToken;
-/**
- * Sign out user from Supabase
- */
 const signOut = async (req, res) => {
     try {
         const { error } = await supabase_1.supabase.auth.signOut();
         if (error) {
             console.error('Error signing out:', error);
-            return res.status(500).json({
-                success: false,
-                error: 'Failed to sign out'
-            });
+            return res.status(500).json({ success: false, error: 'Failed to sign out' });
         }
-        res.json({
-            success: true,
-            message: 'Signed out successfully'
-        });
+        res.json({ success: true, message: 'Signed out successfully' });
     }
     catch (error) {
         console.error('Error in sign out:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Internal server error'
-        });
+        res.status(500).json({ success: false, error: 'Internal server error' });
     }
 };
 exports.signOut = signOut;
-/**
- * Get current user session
- */
 const getCurrentUser = async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({
-                success: false,
-                error: 'No valid authorization header'
-            });
+            return res.status(401).json({ success: false, error: 'No valid authorization header' });
         }
         const token = authHeader.substring(7);
         const { data: { user }, error } = await supabase_1.supabaseAdmin.auth.getUser(token);
         if (error || !user) {
-            return res.status(401).json({
-                success: false,
-                error: 'Invalid token'
-            });
+            return res.status(401).json({ success: false, error: 'Invalid token' });
         }
-        const prismaUser = await (0, user_sync_service_1.getPrismaUserBySupabaseId)(user.id);
-        if (!prismaUser) {
-            return res.status(404).json({
-                success: false,
-                error: 'User not found in database'
-            });
+        const dbUser = await supabase_database_service_1.db.user.findUnique({ email: user.email });
+        if (!dbUser) {
+            return res.status(404).json({ success: false, error: 'User not found in database' });
         }
         res.json({
             success: true,
-            user: prismaUser
+            user: {
+                id: dbUser.id,
+                email: dbUser.email,
+                fullname: dbUser.fullname,
+                username: dbUser.username,
+                phone_number: dbUser.phone_number,
+                auth_provider: dbUser.auth_provider,
+                role: dbUser.role,
+                is_active: dbUser.is_active,
+                date_of_birth: dbUser.date_of_birth,
+                profile_picture: dbUser.profile_picture,
+                howdidyouhearaboutus: dbUser.howdidyouhearaboutus,
+                created_at: dbUser.created_at,
+                updated_at: dbUser.updated_at,
+            }
         });
     }
     catch (error) {
         console.error('Error getting current user:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Internal server error'
-        });
+        res.status(500).json({ success: false, error: 'Internal server error' });
     }
 };
 exports.getCurrentUser = getCurrentUser;

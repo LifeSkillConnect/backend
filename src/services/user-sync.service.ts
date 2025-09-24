@@ -1,6 +1,5 @@
 import { User } from '@supabase/supabase-js';
-import { prisma } from '../views/authentication-view';
-import { supabaseAdmin } from '../config/supabase';
+import { db } from '../services/supabase-database.service';
 
 export interface SyncUserData {
   id: string;
@@ -10,124 +9,55 @@ export interface SyncUserData {
   authProvider: 'GOOGLE' | 'APPLE' | 'EMAIL';
   phoneNumber?: string;
   username?: string;
-  dateOfBirth?: Date;
+  dateOfBirth?: Date | string;
   howdidyouhearaboutus?: string;
 }
 
-/**
- * Syncs a Supabase Auth user with your Prisma database
- * Creates a new user if they don't exist, updates if they do
- */
-export const syncSupabaseUserToPrisma = async (supabaseUser: User): Promise<SyncUserData> => {
-  try {
-    // Extract user data from Supabase Auth user
-    const email = supabaseUser.email!;
-    const fullname = supabaseUser.user_metadata?.full_name || 
-                    supabaseUser.user_metadata?.name || 
-                    `${supabaseUser.user_metadata?.given_name || ''} ${supabaseUser.user_metadata?.family_name || ''}`.trim() ||
-                    'User';
-    
-    const profilePicture = supabaseUser.user_metadata?.avatar_url || 
-                          supabaseUser.user_metadata?.picture || 
-                          null;
-    
-    // Determine auth provider based on Supabase app_metadata
-    const authProvider = supabaseUser.app_metadata?.provider || 'EMAIL';
-    
-    // Check if user exists in Prisma
-    let existingUser = await prisma.user.findUnique({
-      where: { email }
-    });
+export const syncSupabaseUser = async (supabaseUser: User): Promise<SyncUserData> => {
+  const email = supabaseUser.email!;
+  const fullname = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || `${supabaseUser.user_metadata?.given_name || ''} ${supabaseUser.user_metadata?.family_name || ''}`.trim() || 'User';
+  const profilePicture = supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture || undefined;
+  const authProvider = (supabaseUser.app_metadata?.provider || 'EMAIL').toUpperCase() as 'GOOGLE' | 'APPLE' | 'EMAIL';
 
-    if (existingUser) {
-      // Update existing user with latest data from Supabase
-      const updatedUser = await prisma.user.update({
-        where: { id: existingUser.id },
-        data: {
-          fullname,
-          profilePicture,
-          authProvider: authProvider.toUpperCase() as 'GOOGLE' | 'APPLE' | 'EMAIL',
-          isActive: true,
-        }
-      });
-      
-      return {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        fullname: updatedUser.fullname,
-        profilePicture: updatedUser.profilePicture || undefined,
-        authProvider: updatedUser.authProvider as 'GOOGLE' | 'APPLE' | 'EMAIL',
-        phoneNumber: updatedUser.phoneNumber || undefined,
-        username: updatedUser.username || undefined,
-        dateOfBirth: updatedUser.dateOfBirth || undefined,
-        howdidyouhearaboutus: updatedUser.howdidyouhearaboutus || undefined,
-      };
-    } else {
-      // Create new user
-      const newUser = await prisma.user.create({
-        data: {
-          email,
-          fullname,
-          profilePicture,
-          authProvider: authProvider.toUpperCase() as 'GOOGLE' | 'APPLE' | 'EMAIL',
-          isActive: true,
-          role: 'USER',
-        }
-      });
-      
-      return {
-        id: newUser.id,
-        email: newUser.email,
-        fullname: newUser.fullname,
-        profilePicture: newUser.profilePicture || undefined,
-        authProvider: newUser.authProvider as 'GOOGLE' | 'APPLE' | 'EMAIL',
-        phoneNumber: newUser.phoneNumber || undefined,
-        username: newUser.username || undefined,
-        dateOfBirth: newUser.dateOfBirth || undefined,
-        howdidyouhearaboutus: newUser.howdidyouhearaboutus || undefined,
-      };
-    }
-  } catch (error) {
-    console.error('Error syncing Supabase user to Prisma:', error);
-    throw new Error('Failed to sync user data');
-  }
-};
-
-/**
- * Gets a Prisma user by Supabase user ID
- */
-export const getPrismaUserBySupabaseId = async (supabaseUserId: string): Promise<SyncUserData | null> => {
-  try {
-    // First, get the Supabase user to get their email
-    const { data: supabaseUser, error } = await supabaseAdmin.auth.admin.getUserById(supabaseUserId);
-    
-    if (error || !supabaseUser.user) {
-      console.error('Error fetching Supabase user:', error);
-      return null;
-    }
-    
-    // Then find the corresponding Prisma user
-    const prismaUser = await prisma.user.findUnique({
-      where: { email: supabaseUser.user.email! }
+  let user = await db.user.findUnique({ email });
+  if (user) {
+    const updated = await db.user.update(user.id, {
+      fullname,
+      profile_picture: profilePicture,
+      auth_provider: authProvider,
+      is_active: true,
     });
-    
-    if (!prismaUser) {
-      return null;
-    }
-    
     return {
-      id: prismaUser.id,
-      email: prismaUser.email,
-      fullname: prismaUser.fullname,
-      profilePicture: prismaUser.profilePicture || undefined,
-      authProvider: prismaUser.authProvider as 'GOOGLE' | 'APPLE' | 'EMAIL',
-      phoneNumber: prismaUser.phoneNumber || undefined,
-      username: prismaUser.username || undefined,
-      dateOfBirth: prismaUser.dateOfBirth || undefined,
-      howdidyouhearaboutus: prismaUser.howdidyouhearaboutus || undefined,
+      id: updated.id,
+      email: updated.email,
+      fullname: updated.fullname,
+      profilePicture: updated.profile_picture,
+      authProvider,
+      phoneNumber: updated.phone_number,
+      username: updated.username,
+      dateOfBirth: updated.date_of_birth,
+      howdidyouhearaboutus: updated.howdidyouhearaboutus,
     };
-  } catch (error) {
-    console.error('Error getting Prisma user by Supabase ID:', error);
-    return null;
   }
+
+  const created = await db.user.create({
+    email,
+    fullname,
+    profile_picture: profilePicture,
+    auth_provider: authProvider,
+    is_active: true,
+    role: 'USER',
+  });
+
+  return {
+    id: created.id,
+    email: created.email,
+    fullname: created.fullname,
+    profilePicture: created.profile_picture,
+    authProvider,
+    phoneNumber: created.phone_number,
+    username: created.username,
+    dateOfBirth: created.date_of_birth,
+    howdidyouhearaboutus: created.howdidyouhearaboutus,
+  };
 };

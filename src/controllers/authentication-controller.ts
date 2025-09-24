@@ -19,7 +19,6 @@ import {
   verifyAppTokenSiginIn,
   verifyAppTokenSiginUp,
   finishSignup,
-  prisma,
 } from "../views/authentication-view";
 import {
   startGoogleAuth,
@@ -29,6 +28,7 @@ import {
   getCurrentUser,
 } from "../views/supabase-auth-view";
 import { authenticate } from "../middleware/middleware";
+import { db } from "../services/supabase-database.service";
 
 const router = express.Router();
 
@@ -56,7 +56,7 @@ passport.serializeUser((user: any, done) => {
 
 passport.deserializeUser(async (id: string, done) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await db.user.findById(id);
     done(null, user);
   } catch (err) {
     done(err, null);
@@ -101,17 +101,13 @@ passport.use(
           return done(new Error("No valid email found from Apple"));
         }
 
-        let user = await prisma.user.findUnique({
-          where: { email: safeEmail },
-        });
+        let user = await db.user.findUnique({ email: safeEmail });
 
         if (!user) {
-          user = await prisma.user.create({
-            data: {
-              email: safeEmail,
-              fullname: fullName || "Apple User",
-              authProvider: "APPLE",
-            },
+          user = await db.user.create({
+            email: safeEmail,
+            fullname: fullName || "Apple User",
+            auth_provider: "APPLE",
           });
         }
 
