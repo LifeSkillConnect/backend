@@ -13,5 +13,10 @@
     "skipLibCheck": true /* Skip .d.ts checks for speed */
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"] /* Avoid re-compiling output */
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/config/database.ts",
+    "prisma/**"
+  ] /* Avoid re-compiling output and exclude legacy prisma/mongoose */
 }

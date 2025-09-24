@@ -36,15 +36,652 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.resetPassword = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.sendOtp = exports.validateEmail = exports.finishSignup = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.googleCallback = exports.startGoogleAuth = exports.prisma = void 0;
-const client_1 = require("@prisma/client");
+exports.resetPassword = exports.googleCallback = exports.startGoogleAuth = exports.testEmail = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.finishSignup = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.sendOtp = exports.validateEmail = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const yup = __importStar(require("yup"));
 const email_utils_1 = require("../utils/email.utils");
 const auth_schema_1 = require("../validation/auth-schema");
+const supabase_database_service_1 = require("../services/supabase-database.service");
+// Google OAuth Configuration (Legacy - will be replaced by Supabase)
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+const MOBILE_APP_SCHEME = process.env.MOBILE_APP_SCHEME || "lifeskillsconnect://";
+// Validate Email
+const validateEmail = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, error: "Email is required" });
+        }
+        // Check if email already exists
+        const existingUser = await supabase_database_service_1.db.user.findUnique({ email });
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                error: "Email already exists. Please use a different email address.",
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Email is available",
+        });
+    }
+    catch (error) {
+        console.error("Error in validateEmail:", error);
+        return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+};
+exports.validateEmail = validateEmail;
+// Send OTP
+const sendOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, error: "Email is required" });
+        }
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            console.error("❌ Missing email configuration");
+            return res.status(500).json({
+                success: false,
+                error: "Email configuration missing. Please check EMAIL_USER and EMAIL_PASS environment variables."
+            });
+        }
+        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+            console.error("❌ Missing Supabase configuration");
+            return res.status(500).json({
+                success: false,
+                error: "Database configuration missing. Please check Supabase environment variables."
+            });
+        }
+        // Generate 5-digit OTP
+        const otp = Math.floor(10000 + Math.random() * 90000).toString();
+        // Save OTP to database
+        const otpData = {
+            email,
+            otp,
+            is_used: false,
+            expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes from now
+        };
+        await supabase_database_service_1.db.otp.create(otpData);
+        // Send email
+        const emailResult = await (0, email_utils_1.sendEmail)(email, "Your 5-Digit OTP for LifeSkill Connect", `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🔐 Your Verification Code</h2>
+            <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 20px;">Your 5-digit verification code is:</p>
+            <div style="background-color: #f0f8ff; padding: 25px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 25px 0; border: 2px dashed #4a90e2; border-radius: 8px; color: #4a90e2;">
+              ${otp}
+            </div>
+            <p style="color: #888; font-size: 14px; text-align: center; margin: 20px 0;">⏰ This code will expire in 10 minutes.</p>
+            <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">If you didn't request this code, please ignore this email.</p>
+          </div>
+        </div>
+      `);
+        if (!emailResult.success) {
+            console.error("❌ Email sending failed:", emailResult.error);
+            return res.status(500).json({
+                success: false,
+                error: "Failed to send OTP email",
+                details: emailResult.error
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent successfully",
+        });
+    }
+    catch (error) {
+        console.error("❌ Error in sendOtp:", error);
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error"
+        });
+    }
+};
+exports.sendOtp = sendOtp;
+// Verify OTP
+const verifyOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        if (!email || !otp) {
+            return res.status(400).json({ success: false, error: "Email and OTP are required" });
+        }
+        const foundOtp = await supabase_database_service_1.db.otp.findFirst({
+            where: {
+                email,
+                otp,
+                is_used: false,
+            },
+            orderBy: {
+                created_at: "desc",
+            },
+        });
+        if (!foundOtp) {
+            return res.status(400).json({ success: false, error: "Invalid or expired OTP" });
+        }
+        // Check if OTP is expired
+        const now = new Date();
+        const expiresAt = new Date(foundOtp.expires_at);
+        if (now > expiresAt) {
+            return res.status(400).json({ success: false, error: "OTP has expired" });
+        }
+        // Mark as used
+        await supabase_database_service_1.db.otp.update(foundOtp.id, { is_used: true });
+        return res.status(200).json({ success: true, message: "OTP verified successfully" });
+    }
+    catch (error) {
+        console.error("Error in verifyOtp:", error);
+        return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+};
+exports.verifyOtp = verifyOtp;
+// Create Account
+const createAccount = async (req, res) => {
+    try {
+        await auth_schema_1.createAccountSchema.validate(req.body, { abortEarly: false });
+        const { email, password, dateOfBirth, fullName, username, howdidyouhearaboutus, phoneNumber, } = req.body;
+        // Check if user already exists
+        const existingUser = await supabase_database_service_1.db.user.findUnique({ email });
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                error: "Email already exists. Please use a different email address.",
+            });
+        }
+        // Hash password
+        const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+        // Create user in Supabase Auth via Admin API (auto-confirm)
+        const { user: authUser, error: authError } = await supabase_database_service_1.db.auth.signUp(email, password, {
+            full_name: fullName,
+            username,
+            phone_number: phoneNumber,
+            howdidyouhearaboutus,
+        });
+        if (authError) {
+            console.error("Supabase Auth error:", authError);
+            return res.status(400).json({
+                success: false,
+                error: "Failed to create account. Please try again.",
+                details: authError.message,
+            });
+        }
+        // Create user in database table
+        const userData = {
+            email,
+            password: hashedPassword,
+            fullname: fullName,
+            username,
+            phone_number: phoneNumber,
+            auth_provider: "EMAIL",
+            role: "USER",
+            is_active: true,
+            date_of_birth: dateOfBirth ? new Date(dateOfBirth).toISOString() : undefined,
+            howdidyouhearaboutus,
+        };
+        const user = await supabase_database_service_1.db.user.create(userData);
+        // Generate OTP and send email immediately after signup
+        try {
+            const otp = Math.floor(10000 + Math.random() * 90000).toString();
+            await supabase_database_service_1.db.otp.create({
+                email,
+                otp,
+                is_used: false,
+                expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+            });
+            await (0, email_utils_1.sendEmail)(email, "Your 5-Digit OTP for LifeSkill Connect", `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+            <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🔐 Your Verification Code</h2>
+              <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 20px;">Your 5-digit verification code is:</p>
+              <div style="background-color: #f0f8ff; padding: 25px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 25px 0; border: 2px dashed #4a90e2; border-radius: 8px; color: #4a90e2;">
+                ${otp}
+              </div>
+              <p style="color: #888; font-size: 14px; text-align: center; margin: 20px 0;">⏰ This code will expire in 10 minutes.</p>
+              <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">If you didn't request this code, please ignore this email.</p>
+            </div>
+          </div>
+        `);
+        }
+        catch (otpError) {
+            console.error("❌ Failed to send post-signup OTP:", otpError);
+        }
+        // Generate JWT token
+        const token = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        return res.status(200).json({
+            success: true,
+            token: token,
+            user: {
+                id: user.id,
+                email: user.email,
+                fullname: user.fullname,
+                username: user.username,
+                phone_number: user.phone_number,
+                auth_provider: user.auth_provider,
+                role: user.role,
+                is_active: user.is_active,
+                date_of_birth: user.date_of_birth,
+                profile_picture: user.profile_picture,
+                howdidyouhearaboutus: user.howdidyouhearaboutus,
+                created_at: user.created_at,
+                updated_at: user.updated_at,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error in createAccount:", error);
+        if (error instanceof yup.ValidationError) {
+            return res.status(400).json({
+                success: false,
+                errors: error.errors,
+            });
+        }
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error",
+        });
+    }
+};
+exports.createAccount = createAccount;
+// Login
+const login = async (req, res) => {
+    try {
+        await auth_schema_1.loginSchema.validate(req.body, { abortEarly: false });
+        const { email, password } = req.body;
+        // Check if user exists in database
+        const user = await supabase_database_service_1.db.user.findUnique({ email });
+        if (!user) {
+            return res.status(404).json({
+                message: "Incorrect email or password",
+                success: false,
+            });
+        }
+        // Prevent password login for Google/Apple accounts
+        if (user.auth_provider === "GOOGLE" || user.auth_provider === "APPLE") {
+            return res.status(400).json({
+                message: `This account was created using ${user.auth_provider}. Please log in with ${user.auth_provider} instead.`,
+                success: false,
+            });
+        }
+        // Compare passwords
+        const isMatch = await bcryptjs_1.default.compare(password, user.password || "");
+        if (!isMatch) {
+            return res.status(400).json({
+                message: "Incorrect email or password",
+                success: false,
+            });
+        }
+        // Sign in with Supabase Auth
+        const { user: authUser, error: authError } = await supabase_database_service_1.db.auth.signIn(email, password);
+        if (authError) {
+            console.error("Supabase Auth error:", authError);
+            return res.status(400).json({
+                message: "Authentication failed",
+                success: false,
+            });
+        }
+        // Generate JWT token
+        const token = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        return res.status(200).json({
+            success: true,
+            token: token,
+            user: {
+                id: user.id,
+                email: user.email,
+                fullname: user.fullname,
+                username: user.username,
+                phone_number: user.phone_number,
+                auth_provider: user.auth_provider,
+                role: user.role,
+                is_active: user.is_active,
+                date_of_birth: user.date_of_birth,
+                profile_picture: user.profile_picture,
+                howdidyouhearaboutus: user.howdidyouhearaboutus,
+                created_at: user.created_at,
+                updated_at: user.updated_at,
+            },
+        });
+    }
+    catch (error) {
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ errors: error.errors, success: false });
+        }
+        console.error("Login error:", error);
+        return res.status(500).json({ message: "Internal server error", success: false });
+    }
+};
+exports.login = login;
+// Get Profile
+const getProfile = async (req, res) => {
+    try {
+        const userId = req.userId;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                error: "User not authenticated",
+            });
+        }
+        const user = await supabase_database_service_1.db.user.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: "User not found",
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            user: {
+                id: user.id,
+                email: user.email,
+                fullname: user.fullname,
+                username: user.username,
+                phone_number: user.phone_number,
+                auth_provider: user.auth_provider,
+                role: user.role,
+                is_active: user.is_active,
+                date_of_birth: user.date_of_birth,
+                profile_picture: user.profile_picture,
+                howdidyouhearaboutus: user.howdidyouhearaboutus,
+                created_at: user.created_at,
+                updated_at: user.updated_at,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error in getProfile:", error);
+        return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+};
+exports.getProfile = getProfile;
+// Finish Signup
+const finishSignup = async (req, res) => {
+    try {
+        await auth_schema_1.finishSignupSchema.validate(req.body, { abortEarly: false });
+        const userId = req.userId;
+        const { username, phoneNumber, dateOfBirth, howdidyouhearaboutus } = req.body;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                error: "User not authenticated",
+            });
+        }
+        const user = await supabase_database_service_1.db.user.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: "User not found",
+            });
+        }
+        // Update user profile
+        const updatedUser = await supabase_database_service_1.db.user.update(userId, {
+            username,
+            phone_number: phoneNumber,
+            date_of_birth: dateOfBirth ? new Date(dateOfBirth).toISOString() : undefined,
+            howdidyouhearaboutus,
+        });
+        return res.status(200).json({
+            success: true,
+            message: "Profile updated successfully",
+            user: {
+                id: updatedUser.id,
+                email: updatedUser.email,
+                fullname: updatedUser.fullname,
+                username: updatedUser.username,
+                phone_number: updatedUser.phone_number,
+                auth_provider: updatedUser.auth_provider,
+                role: updatedUser.role,
+                is_active: updatedUser.is_active,
+                date_of_birth: updatedUser.date_of_birth,
+                profile_picture: updatedUser.profile_picture,
+                howdidyouhearaboutus: updatedUser.howdidyouhearaboutus,
+                created_at: updatedUser.created_at,
+                updated_at: updatedUser.updated_at,
+            },
+        });
+    }
+    catch (error) {
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ errors: error.errors, success: false });
+        }
+        console.error("Error in finishSignup:", error);
+        return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+};
+exports.finishSignup = finishSignup;
+// Fetch All Modules
+const fetchAllModules = async (req, res) => {
+    try {
+        const modules = await supabase_database_service_1.db.module.findMany();
+        return res.status(200).json({
+            success: true,
+            modules: modules.map(module => ({
+                id: module.id,
+                title: module.title,
+                plan_type: module.plan_type,
+                is_certification_on_completion: module.is_certification_on_completion,
+                total_hours: module.total_hours,
+                subtitle_available: module.subtitle_available,
+                description: module.description,
+                features: module.features,
+                created_at: module.created_at,
+                updated_at: module.updated_at,
+                user_id: module.user_id,
+            })),
+        });
+    }
+    catch (error) {
+        console.error("Error in fetchAllModules:", error);
+        return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+};
+exports.fetchAllModules = fetchAllModules;
+// Add Modules to User
+const addModulesToUser = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { moduleIds } = req.body;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                error: "User not authenticated",
+            });
+        }
+        if (!moduleIds || !Array.isArray(moduleIds)) {
+            return res.status(400).json({
+                success: false,
+                error: "Module IDs are required",
+            });
+        }
+        await supabase_database_service_1.db.module.assignToUser(moduleIds, userId);
+        return res.status(200).json({
+            success: true,
+            message: "Modules assigned successfully",
+        });
+    }
+    catch (error) {
+        console.error("Error in addModulesToUser:", error);
+        return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+};
+exports.addModulesToUser = addModulesToUser;
+// Save Module
+const saveModule = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const moduleData = req.body;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                error: "User not authenticated",
+            });
+        }
+        const module = await supabase_database_service_1.db.module.create({
+            ...moduleData,
+            user_id: userId,
+        });
+        return res.status(200).json({
+            success: true,
+            message: "Module saved successfully",
+            module: {
+                id: module.id,
+                title: module.title,
+                plan_type: module.plan_type,
+                is_certification_on_completion: module.is_certification_on_completion,
+                total_hours: module.total_hours,
+                subtitle_available: module.subtitle_available,
+                description: module.description,
+                features: module.features,
+                created_at: module.created_at,
+                updated_at: module.updated_at,
+                user_id: module.user_id,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error in saveModule:", error);
+        return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+};
+exports.saveModule = saveModule;
+// Verify App Token Sign In
+const verifyAppTokenSiginIn = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                error: "Token is required",
+            });
+        }
+        // Verify JWT token
+        const decoded = jsonwebtoken_1.default.verify(id, process.env.JWT_SECRET);
+        const user = await supabase_database_service_1.db.user.findById(decoded.userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: "User not found",
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Token verified successfully",
+            user: {
+                id: user.id,
+                email: user.email,
+                fullname: user.fullname,
+                username: user.username,
+                phone_number: user.phone_number,
+                auth_provider: user.auth_provider,
+                role: user.role,
+                is_active: user.is_active,
+                date_of_birth: user.date_of_birth,
+                profile_picture: user.profile_picture,
+                howdidyouhearaboutus: user.howdidyouhearaboutus,
+                created_at: user.created_at,
+                updated_at: user.updated_at,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error in verifyAppTokenSiginIn:", error);
+        return res.status(401).json({
+            success: false,
+            error: "Invalid token",
+        });
+    }
+};
+exports.verifyAppTokenSiginIn = verifyAppTokenSiginIn;
+// Verify App Token Sign Up
+const verifyAppTokenSiginUp = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                error: "Token is required",
+            });
+        }
+        // Verify JWT token
+        const decoded = jsonwebtoken_1.default.verify(id, process.env.JWT_SECRET);
+        const user = await supabase_database_service_1.db.user.findById(decoded.userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: "User not found",
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Token verified successfully",
+            user: {
+                id: user.id,
+                email: user.email,
+                fullname: user.fullname,
+                username: user.username,
+                phone_number: user.phone_number,
+                auth_provider: user.auth_provider,
+                role: user.role,
+                is_active: user.is_active,
+                date_of_birth: user.date_of_birth,
+                profile_picture: user.profile_picture,
+                howdidyouhearaboutus: user.howdidyouhearaboutus,
+                created_at: user.created_at,
+                updated_at: user.updated_at,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error in verifyAppTokenSiginUp:", error);
+        return res.status(401).json({
+            success: false,
+            error: "Invalid token",
+        });
+    }
+};
+exports.verifyAppTokenSiginUp = verifyAppTokenSiginUp;
+// Test email endpoint
+const testEmail = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, error: "Email is required" });
+        }
+        const result = await (0, email_utils_1.sendEmail)(email, "🧪 Test Email from LifeSkill Connect", `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #333;">🧪 Test Email</h2>
+          <p>This is a test email to verify email configuration.</p>
+          <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+          <p><strong>From:</strong> LifeSkill Connect Backend</p>
+        </div>
+      `);
+        if (result.success) {
+            return res.status(200).json({
+                success: true,
+                message: "Test email sent successfully",
+                details: result
+            });
+        }
+        else {
+            return res.status(500).json({
+                success: false,
+                error: "Failed to send test email",
+                details: result.error
+            });
+        }
+    }
+    catch (error) {
+        console.error("Error in testEmail:", error);
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error",
+            details: error
+        });
+    }
+};
+exports.testEmail = testEmail;
 const axios_1 = __importDefault(require("axios"));
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-exports.prisma = new client_1.PrismaClient();
+// Using Supabase DB service (db)
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
@@ -94,21 +731,15 @@ const googleCallback = async (req, res) => {
         const { email, family_name, given_name, id, name, picture, verified_email, } = profileResponse.data;
         // TODO: Authenticate or create the user in your DB
         // Example: await saveUser(profile);
-        let isPresent = await exports.prisma.user.findUnique({
-            where: {
-                email: email,
-            },
-        });
+        let isPresent = await supabase_database_service_1.db.user.findUnique({ email });
         if (!isPresent) {
-            isPresent = await exports.prisma.user.create({
-                data: {
-                    email,
-                    fullname: name,
-                    isActive: true,
-                    role: "USER",
-                    authProvider: "GOOGLE",
-                    profilePicture: picture,
-                },
+            isPresent = await supabase_database_service_1.db.user.create({
+                email,
+                fullname: name,
+                is_active: true,
+                role: "USER",
+                auth_provider: "GOOGLE",
+                profile_picture: picture,
             });
             const token = jsonwebtoken_1.default.sign({ userId: isPresent.id, email: isPresent.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
             console.log("Generated token for new user:", { userId: isPresent.id, email: isPresent.email });
@@ -269,7 +900,7 @@ const finishSignup = async (req, res) => {
             });
         }
         // ✅ Check if user exists
-        const user = await exports.prisma.user.findUnique({ where: { id: userId } });
+        const user = await supabase_database_service_1.db.user.findById(userId);
         if (!user) {
             return res.status(404).json({
                 success: false,
@@ -277,9 +908,11 @@ const finishSignup = async (req, res) => {
             });
         }
         // ✅ Update user data
-        await exports.prisma.user.update({
-            where: { id: user.id },
-            data: { phoneNumber, dateOfBirth, username, howdidyouhearaboutus },
+        await supabase_database_service_1.db.user.update(user.id, {
+            phone_number: phoneNumber,
+            date_of_birth: dateOfBirth ? new Date(dateOfBirth).toISOString() : undefined,
+            username,
+            howdidyouhearaboutus,
         });
         // ✅ Generate new token
         const token = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
@@ -317,9 +950,7 @@ const validateEmail = async (req, res) => {
             .json({ success: false, error: "Invalid email format" });
     }
     try {
-        const existingUser = await exports.prisma.user.findUnique({
-            where: { email },
-        });
+        const existingUser = await supabase_database_service_1.db.user.findUnique({ email });
         if (existingUser) {
             return res.status(409).json({
                 success: false,
@@ -352,7 +983,7 @@ const sendOtp = async (req, res) => {
         const OTP = Math.floor(10000 + Math.random() * 90000).toString();
         // If check_exists is true (e.g., forgot password), validate email exists
         if (check_exists == true) {
-            const existingUser = await exports.prisma.user.findUnique({ where: { email } });
+            const existingUser = await supabase_database_service_1.db.user.findUnique({ email });
             if (!existingUser) {
                 return res
                     .status(404)
@@ -360,28 +991,17 @@ const sendOtp = async (req, res) => {
             }
         }
         // Save OTP to DB
-        const isPresent = await exports.prisma.otp.findFirst({
-            where: {
-                email,
-                isUsed: false,
-            },
+        const isPresent = await supabase_database_service_1.db.otp.findFirst({
+            where: { email, otp: OTP, is_used: false },
+            orderBy: { created_at: 'desc' },
         });
         if (!isPresent) {
             // If no existing OTP, create a new one
-            await exports.prisma.otp.create({
-                data: {
-                    email,
-                    otp: OTP,
-                    isUsed: false,
-                },
-            });
+            await supabase_database_service_1.db.otp.create({ email, otp: OTP, is_used: false, expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() });
         }
         else {
             // If an existing OTP is found, update it
-            await exports.prisma.otp.update({
-                where: { id: isPresent.id },
-                data: { otp: OTP, isUsed: false },
-            });
+            await supabase_database_service_1.db.otp.update(isPresent.id, { otp: OTP, is_used: false });
         }
         // Send email
         await (0, email_utils_1.sendEmail)(email, "Your OTP Code", `<p>Your OTP code is: <strong>${OTP}</strong></p>`);
@@ -406,15 +1026,9 @@ const verifyOtp = async (req, res) => {
                 .status(400)
                 .json({ success: false, error: "Email and OTP are required" });
         }
-        const foundOtp = await exports.prisma.otp.findFirst({
-            where: {
-                email,
-                otp,
-                isUsed: false,
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
+        const foundOtp = await supabase_database_service_1.db.otp.findFirst({
+            where: { email, otp, is_used: false },
+            orderBy: { created_at: 'desc' },
         });
         if (!foundOtp) {
             return res
@@ -428,10 +1042,7 @@ const verifyOtp = async (req, res) => {
         //   return res.status(410).json({ success: false, error: "OTP expired" });
         // }
         // Mark as used
-        await exports.prisma.otp.update({
-            where: { id: foundOtp.id },
-            data: { isUsed: true },
-        });
+        await supabase_database_service_1.db.otp.update(foundOtp.id, { is_used: true });
         return res
             .status(200)
             .json({ success: true, message: "OTP verified successfully" });
@@ -451,11 +1062,7 @@ const createAccount = async (req, res) => {
         const { email, password, dateOfBirth, fullName, username, howdidyouhearaboutus, phoneNumber, } = req.body;
         // Your account creation logic here
         // e.g., save to database, hash password, etc.
-        const isPresent = await exports.prisma.user.findUnique({
-            where: {
-                email: email,
-            },
-        });
+        const isPresent = await supabase_database_service_1.db.user.findUnique({ email });
         if (isPresent) {
             return res.status(409).json({
                 success: false,
@@ -463,19 +1070,17 @@ const createAccount = async (req, res) => {
             });
         }
         const hashedPassword = await bcryptjs_1.default.hash(password, 10);
-        const user = await exports.prisma.user.create({
-            data: {
-                email,
-                password: hashedPassword,
-                dateOfBirth: new Date(dateOfBirth),
-                fullname: fullName,
-                isActive: true,
-                role: "USER",
-                username: username,
-                authProvider: "EMAIL",
-                howdidyouhearaboutus,
-                phoneNumber,
-            },
+        const user = await supabase_database_service_1.db.user.create({
+            email,
+            password: hashedPassword,
+            date_of_birth: dateOfBirth ? new Date(dateOfBirth).toISOString() : undefined,
+            fullname: fullName,
+            is_active: true,
+            role: "USER",
+            username,
+            auth_provider: "EMAIL",
+            howdidyouhearaboutus,
+            phone_number: phoneNumber,
         });
         const token = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
         return res.status(200).json({
@@ -505,14 +1110,14 @@ const login = async (req, res) => {
         await auth_schema_1.loginSchema.validate(req.body, { abortEarly: false });
         const { email, password } = req.body;
         // ✅ Check if user exists
-        const user = await exports.prisma.user.findUnique({ where: { email } });
+        const user = await supabase_database_service_1.db.user.findUnique({ email });
         if (!user) {
             return res
                 .status(404)
                 .json({ message: "Incorrect ID", success: false });
         }
         // ✅ Prevent password login for Google/Apple accounts
-        if (user.authProvider === "GOOGLE" || user.authProvider === "APPLE") {
+        if (user.auth_provider === "GOOGLE" || user.auth_provider === "APPLE") {
             return res.status(400).json({
                 message: `This account was created using ${user.authProvider}. Please log in with ${user.authProvider} instead.`,
                 success: false,
@@ -548,9 +1153,7 @@ const getProfile = async (req, res) => {
                 .status(401)
                 .json({ error: "User is not logged in", success: false });
         }
-        const user = await exports.prisma.user.findUnique({
-            where: { id: userId },
-        });
+        const user = await supabase_database_service_1.db.user.findById(userId);
         if (!user) {
             return res.status(400).json({ error: "Invalid User", success: false });
         }
@@ -628,14 +1231,14 @@ const resetPassword = async (req, res) => {
         await auth_schema_1.resetPasswordSchema.validate(req.body, { abortEarly: false });
         const { email, password } = req.body;
         // Find user
-        const user = await exports.prisma.user.findUnique({ where: { email } });
+        const user = await supabase_database_service_1.db.user.findUnique({ where: { email } });
         if (!user) {
             return res
                 .status(404)
                 .json({ success: false, message: "User not found" });
         }
         // Check if account is Google/Apple
-        if (user.authProvider && user.authProvider !== "EMAIL") {
+        if (user.auth_provider === "GOOGLE" || user.auth_provider === "APPLE") {
             return res.status(400).json({
                 success: false,
                 message: `Password reset is not available for ${user.authProvider} accounts`,
@@ -643,7 +1246,7 @@ const resetPassword = async (req, res) => {
         }
         // Hash and update new password
         const hashedPassword = await bcryptjs_1.default.hash(password, 10);
-        await exports.prisma.user.update({
+        await supabase_database_service_1.db.user.update({
             where: { email },
             data: { password: hashedPassword },
         });
@@ -667,7 +1270,7 @@ exports.resetPassword = resetPassword;
 // Fetch All Modules
 const fetchAllModules = async (req, res) => {
     try {
-        const modules = await exports.prisma.module.findMany({});
+        const modules = await supabase_database_service_1.db.module.findMany({});
         return res.status(200).json({
             success: true,
             modules,
@@ -694,7 +1297,7 @@ const addModulesToUser = async (req, res) => {
             });
         }
         // 1. Find the user
-        const user = await exports.prisma.user.findUnique({ where: { email } });
+        const user = await supabase_database_service_1.db.user.findUnique({ where: { email } });
         if (!user) {
             return res.status(404).json({
                 success: false,
@@ -702,7 +1305,7 @@ const addModulesToUser = async (req, res) => {
             });
         }
         // 2. Validate module IDs exist
-        const existingModules = await exports.prisma.module.findMany({
+        const existingModules = await supabase_database_service_1.db.module.findMany({
             where: { id: { in: moduleIds } },
             select: { id: true },
         });
@@ -715,7 +1318,7 @@ const addModulesToUser = async (req, res) => {
             });
         }
         // 3. Assign modules to user
-        await exports.prisma.module.updateMany({
+        await supabase_database_service_1.db.module.updateMany({
             where: { id: { in: existingModuleIds } },
             data: { userId: user.id },
         });
@@ -757,7 +1360,7 @@ const saveModule = async (req, res) => {
             });
         }
         // --- 3. Save to database ---
-        const module = await exports.prisma.module.create({
+        const module = await supabase_database_service_1.db.module.create({
             data: {
                 title: data.title,
                 plan_type: data.plan_type,

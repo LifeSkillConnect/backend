@@ -238,14 +238,15 @@ exports.ModuleService = ModuleService;
  */
 class AuthService {
     static async signUp(email, password, metadata) {
-        const { data, error } = await supabase_1.supabase.auth.signUp({
+        var _a;
+        // Use Admin API to create user as confirmed and avoid Supabase confirmation emails
+        const { data, error } = await supabase_1.supabaseAdmin.auth.admin.createUser({
             email,
             password,
-            options: {
-                data: metadata
-            }
+            email_confirm: true,
+            user_metadata: metadata || {}
         });
-        return { user: data.user, error };
+        return { user: (_a = data === null || data === void 0 ? void 0 : data.user) !== null && _a !== void 0 ? _a : null, error };
     }
     static async signIn(email, password) {
         const { data, error } = await supabase_1.supabase.auth.signInWithPassword({
