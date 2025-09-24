@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetPassword = exports.testEmail = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.finishSignup = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.sendOtp = exports.validateEmail = void 0;
+exports.testEmailConfig = exports.resetPassword = exports.testEmail = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.finishSignup = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.sendOtp = exports.validateEmail = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const yup = __importStar(require("yup"));
@@ -729,3 +729,52 @@ const resetPassword = async (req, res) => {
     }
 };
 exports.resetPassword = resetPassword;
+// Test Email Configuration - Debug endpoint
+const testEmailConfig = async (req, res) => {
+    try {
+        const { testEmail } = req.body;
+        if (!testEmail) {
+            return res.status(400).json({
+                success: false,
+                error: "testEmail is required in request body"
+            });
+        }
+        console.log("🔍 Testing email configuration...");
+        console.log("Environment variables:", {
+            hasEmailUser: !!process.env.EMAIL_USER,
+            hasEmailPass: !!process.env.EMAIL_PASS,
+            emailUserPreview: process.env.EMAIL_USER ? `${process.env.EMAIL_USER.substring(0, 3)}***` : 'MISSING',
+            nodeEnv: process.env.NODE_ENV
+        });
+        // Test email sending
+        const emailResult = await (0, email_utils_1.sendEmail)(testEmail, "Test Email Configuration - LifeSkill Connect", `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #333; text-align: center;">✅ Email Configuration Test</h2>
+            <p style="color: #666; font-size: 16px; text-align: center;">This is a test email to verify email configuration.</p>
+            <p style="color: #888; font-size: 14px; text-align: center; margin-top: 20px;">Time: ${new Date().toLocaleString()}</p>
+            <p style="color: #888; font-size: 14px; text-align: center;">From: LifeSkill Connect Backend</p>
+          </div>
+        </div>
+      `);
+        return res.status(200).json({
+            success: true,
+            message: "Email configuration test completed",
+            emailResult,
+            environment: {
+                hasEmailUser: !!process.env.EMAIL_USER,
+                hasEmailPass: !!process.env.EMAIL_PASS,
+                nodeEnv: process.env.NODE_ENV
+            }
+        });
+    }
+    catch (error) {
+        console.error("❌ Error in testEmailConfig:", error);
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error",
+            details: error
+        });
+    }
+};
+exports.testEmailConfig = testEmailConfig;

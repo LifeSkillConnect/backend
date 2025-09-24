@@ -101,6 +101,7 @@ router.post("/verify-otp", authentication_view_1.verifyOtp);
 // ---------------- Account Routes ----------------
 router.post("/create-account", authentication_view_1.createAccount);
 router.post("/login", authentication_view_1.login);
+router.post("/test-email-config", authentication_view_1.testEmailConfig);
 router.put("/reset-password", authentication_view_1.resetPassword);
 router.get("/profile", middleware_1.authenticate, authentication_view_1.getProfile);
 router.post("/finish-signup", middleware_1.authenticate, authentication_view_1.finishSignup);
