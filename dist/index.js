@@ -7,6 +7,10 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const authentication_controller_1 = __importDefault(require("./controllers/authentication-controller"));
+const modules_controller_1 = __importDefault(require("./controllers/modules-controller"));
+const rewards_controller_1 = __importDefault(require("./controllers/rewards-controller"));
+const subscription_controller_1 = __importDefault(require("./controllers/subscription-controller"));
+const dashboard_controller_1 = __importDefault(require("./controllers/dashboard-controller"));
 const morgan_1 = __importDefault(require("morgan"));
 const config_utils_1 = require("./utils/config.utils");
 const middleware_1 = require("./middleware/middleware");
@@ -73,6 +77,10 @@ app.get("/test-protected", middleware_1.authenticate, (req, res) => {
 });
 // Routes
 app.use("/api/v1/auth", authentication_controller_1.default);
+app.use("/api/v1/modules", modules_controller_1.default);
+app.use("/api/v1/rewards", rewards_controller_1.default);
+app.use("/api/v1/subscription", subscription_controller_1.default);
+app.use("/api/v1/dashboard", dashboard_controller_1.default);
 // 404 handler
 app.use((_req, res) => {
     res.status(404).json({ success: false, error: "Route not found" });

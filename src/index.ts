@@ -2,6 +2,10 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import authenticationController from "./controllers/authentication-controller";
+import modulesController from "./controllers/modules-controller";
+import rewardsController from "./controllers/rewards-controller";
+import subscriptionController from "./controllers/subscription-controller";
+import dashboardController from "./controllers/dashboard-controller";
 import morgan from "morgan";
 import { validateGoogleOAuthConfig, logOAuthConfig } from "./utils/config.utils";
 import { authenticate } from "./middleware/middleware";
@@ -82,6 +86,10 @@ app.get("/test-protected", authenticate, (req: any, res) => {
 
 // Routes
 app.use("/api/v1/auth", authenticationController);
+app.use("/api/v1/modules", modulesController);
+app.use("/api/v1/rewards", rewardsController);
+app.use("/api/v1/subscription", subscriptionController);
+app.use("/api/v1/dashboard", dashboardController);
 
 // 404 handler
 app.use((_req, res) => {
