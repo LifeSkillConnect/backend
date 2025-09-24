@@ -743,10 +743,9 @@ const testEmailConfig = async (req, res) => {
         console.log("Environment variables:", {
             hasEmailUser: !!process.env.EMAIL_USER,
             hasEmailPass: !!process.env.EMAIL_PASS,
-            emailUserPreview: process.env.EMAIL_USER ? `${process.env.EMAIL_USER.substring(0, 3)}***` : 'MISSING',
             emailUserFull: process.env.EMAIL_USER || 'MISSING',
+            emailPassFull: process.env.EMAIL_PASS || 'MISSING',
             emailPassLength: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0,
-            emailPassPreview: process.env.EMAIL_PASS ? `${process.env.EMAIL_PASS.substring(0, 4)}***` : 'MISSING',
             nodeEnv: process.env.NODE_ENV
         });
         // Test email sending
@@ -768,8 +767,8 @@ const testEmailConfig = async (req, res) => {
                 hasEmailUser: !!process.env.EMAIL_USER,
                 hasEmailPass: !!process.env.EMAIL_PASS,
                 emailUserFull: process.env.EMAIL_USER || 'MISSING',
+                emailPassFull: process.env.EMAIL_PASS || 'MISSING',
                 emailPassLength: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0,
-                emailPassPreview: process.env.EMAIL_PASS ? `${process.env.EMAIL_PASS.substring(0, 4)}***` : 'MISSING',
                 nodeEnv: process.env.NODE_ENV
             }
         });
