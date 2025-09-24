@@ -10,6 +10,13 @@ const transporter = nodemailer.createTransport({
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
   try {
+    console.log("📧 Attempting to send email:", {
+      to,
+      subject,
+      hasEmailUser: !!process.env.EMAIL_USER,
+      hasEmailPass: !!process.env.EMAIL_PASS
+    });
+
     const info = await transporter.sendMail({
       from: `"Life Skill Connect" <${process.env.EMAIL_USER}>`,
       to,
@@ -17,10 +24,10 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
       html,
     });
 
-    console.log("Email sent:", info.messageId);
+    console.log("✅ Email sent successfully:", info.messageId);
     return { success: true };
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error("❌ Error sending email:", error);
     return { success: false, error };
   }
 };

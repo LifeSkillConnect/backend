@@ -257,6 +257,12 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
       );
     } catch (otpError) {
       console.error("❌ Failed to send post-signup OTP:", otpError);
+      // Log more details for debugging
+      console.error("Email config check:", {
+        hasEmailUser: !!process.env.EMAIL_USER,
+        hasEmailPass: !!process.env.EMAIL_PASS,
+        emailUser: process.env.EMAIL_USER ? `${process.env.EMAIL_USER.substring(0, 3)}***` : 'missing'
+      });
     }
 
     // Generate JWT token
