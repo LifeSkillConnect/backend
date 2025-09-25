@@ -336,13 +336,13 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
 
       if (!emailResult.success) {
         console.error("❌ Email sending failed:", emailResult.error);
-        // Don't fail the registration if email fails, but log the error
+        throw new Error(`Failed to send OTP email: ${emailResult.error}`);
       } else {
         console.log("✅ OTP email sent successfully!");
       }
     } catch (otpError) {
       console.error("❌ Error sending OTP:", otpError);
-      // Don't fail the registration if OTP fails, but log the error
+      throw new Error(`OTP sending failed: ${otpError.message}`);
     }
 
     // Generate JWT token
