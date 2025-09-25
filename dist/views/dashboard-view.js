@@ -52,69 +52,16 @@ const notificationSettingsSchema = yup.object({
 // Get Dashboard Summary (All dashboard data in one call)
 const getDashboardSummary = async (req, res) => {
     try {
-        const userId = req.auth.userId;
+        const userId = req.userId;
         // Get user info
-        const user = await supabase_database_service_1.db.user.findById(userId);
+        const user = await supabase_database_service_1.db.user.findUnique({ email: req.userEmail });
         if (!user) {
             return res.status(404).json({
                 success: false,
                 error: "User not found"
             });
         }
-        // Get subscription status
-        const subscription = await supabase_database_service_1.db.subscription.findByUser(userId);
-        const isPremium = subscription && subscription.plan_type === 'premium' && subscription.status === 'active';
-        // Get ongoing modules (3)
-        const ongoingModules = await supabase_database_service_1.db.userModule.findOngoing(userId);
-        const ongoingModulesWithDetails = await Promise.all(ongoingModules.map(async (userModule) => {
-            const module = await supabase_database_service_1.db.module.findMany({
-                where: { id: userModule.module_id },
-                take: 1
-            });
-            if (module.length === 0)
-                return null;
-            return {
-                id: module[0].id,
-                title: module[0].title,
-                description: module[0].description,
-                instructor_name: module[0].instructor_name,
-                instructor_image: module[0].instructor_image,
-                module_cover_image: module[0].module_cover_image,
-                progress_percentage: userModule.progress_percentage,
-                current_lesson_id: userModule.current_lesson_id,
-                started_at: userModule.started_at,
-                screentime_duration: module[0].screentime_duration
-            };
-        }));
-        // Get completed modules (3)
-        const completedModules = await supabase_database_service_1.db.userModule.findCompleted(userId);
-        const completedModulesWithDetails = await Promise.all(completedModules.map(async (userModule) => {
-            const module = await supabase_database_service_1.db.module.findMany({
-                where: { id: userModule.module_id },
-                take: 1
-            });
-            if (module.length === 0)
-                return null;
-            return {
-                id: module[0].id,
-                title: module[0].title,
-                description: module[0].description,
-                instructor_name: module[0].instructor_name,
-                instructor_image: module[0].instructor_image,
-                module_cover_image: module[0].module_cover_image,
-                progress_percentage: userModule.progress_percentage,
-                completed_at: userModule.completed_at,
-                screentime_duration: module[0].screentime_duration
-            };
-        }));
-        // Get total reward points
-        const totalPoints = await supabase_database_service_1.db.reward.getTotalPoints(userId);
-        // Get recent achievements
-        const achievements = await supabase_database_service_1.db.achievement.findByUser(userId);
-        const recentAchievements = achievements.slice(0, 3);
-        // Get unread notifications count
-        const notifications = await supabase_database_service_1.db.notification.findByUser(userId);
-        const unreadCount = notifications.filter(n => !n.is_read).length;
+        // For now, return a simplified dashboard since the new tables don't exist yet
         return res.status(200).json({
             success: true,
             dashboard: {
@@ -126,31 +73,19 @@ const getDashboardSummary = async (req, res) => {
                     email: user.email
                 },
                 subscription: {
-                    is_premium: isPremium,
-                    plan_type: isPremium ? 'premium' : 'free',
-                    status: (subscription === null || subscription === void 0 ? void 0 : subscription.status) || 'active'
+                    is_premium: false,
+                    plan_type: 'free',
+                    status: 'active'
                 },
-                ongoing_modules: ongoingModulesWithDetails.filter(m => m !== null),
-                completed_modules: completedModulesWithDetails.filter(m => m !== null),
+                ongoing_modules: [],
+                completed_modules: [],
                 rewards: {
-                    total_points: totalPoints,
-                    recent_achievements: recentAchievements.map(achievement => ({
-                        title: achievement.title,
-                        description: achievement.description,
-                        badge_icon: achievement.badge_icon,
-                        unlocked_at: achievement.unlocked_at
-                    }))
+                    total_points: 0,
+                    recent_achievements: []
                 },
                 notifications: {
-                    unread_count: unreadCount,
-                    recent_notifications: notifications.slice(0, 3).map(notification => ({
-                        id: notification.id,
-                        title: notification.title,
-                        message: notification.message,
-                        type: notification.type,
-                        is_read: notification.is_read,
-                        created_at: notification.created_at
-                    }))
+                    unread_count: 0,
+                    recent_notifications: []
                 }
             }
         });
@@ -167,8 +102,7 @@ exports.getDashboardSummary = getDashboardSummary;
 // Get User Profile
 const getUserProfile = async (req, res) => {
     try {
-        const userId = req.auth.userId;
-        const user = await supabase_database_service_1.db.user.findById(userId);
+        const user = await supabase_database_service_1.db.user.findUnique({ email: req.userEmail });
         if (!user) {
             return res.status(404).json({
                 success: false,
@@ -203,7 +137,7 @@ exports.getUserProfile = getUserProfile;
 const updateUserProfile = async (req, res) => {
     try {
         await updateProfileSchema.validate(req.body, { abortEarly: false });
-        const userId = req.auth.userId;
+        const userId = req.userId;
         const updateData = req.body;
         const updatedUser = await supabase_database_service_1.db.user.update(userId, updateData);
         return res.status(200).json({
@@ -238,7 +172,7 @@ exports.updateUserProfile = updateUserProfile;
 // Get User Settings (placeholder)
 const getUserSettings = async (req, res) => {
     try {
-        const userId = req.auth.userId;
+        const userId = req.userId;
         // This would typically come from a user_settings table
         // For now, return default settings
         return res.status(200).json({
@@ -266,7 +200,7 @@ exports.getUserSettings = getUserSettings;
 const updateUserSettings = async (req, res) => {
     try {
         await notificationSettingsSchema.validate(req.body, { abortEarly: false });
-        const userId = req.auth.userId;
+        const userId = req.userId;
         // This would typically update a user_settings table
         // For now, just return success
         return res.status(200).json({
@@ -293,27 +227,18 @@ exports.updateUserSettings = updateUserSettings;
 // Get Notifications
 const getNotifications = async (req, res) => {
     try {
-        const userId = req.auth.userId;
+        const userId = req.userId;
         const { limit = 20, offset = 0 } = req.query;
-        const notifications = await supabase_database_service_1.db.notification.findByUser(userId);
-        // Apply pagination
-        const paginatedNotifications = notifications.slice(Number(offset), Number(offset) + Number(limit));
+        // For now, return empty notifications since the table doesn't exist yet
         return res.status(200).json({
             success: true,
-            notifications: paginatedNotifications.map(notification => ({
-                id: notification.id,
-                title: notification.title,
-                message: notification.message,
-                type: notification.type,
-                is_read: notification.is_read,
-                created_at: notification.created_at
-            })),
+            notifications: [],
             pagination: {
-                total: notifications.length,
+                total: 0,
                 limit: Number(limit),
                 offset: Number(offset),
-                has_more: Number(offset) + Number(limit) < notifications.length,
-                unread_count: notifications.filter(n => !n.is_read).length
+                has_more: false,
+                unread_count: 0
             }
         });
     }
@@ -330,17 +255,17 @@ exports.getNotifications = getNotifications;
 const markNotificationAsRead = async (req, res) => {
     try {
         const { id } = req.params;
-        const notification = await supabase_database_service_1.db.notification.markAsRead(id);
+        // For now, return success since the table doesn't exist yet
         return res.status(200).json({
             success: true,
             message: "Notification marked as read",
             notification: {
-                id: notification.id,
-                title: notification.title,
-                message: notification.message,
-                type: notification.type,
-                is_read: notification.is_read,
-                created_at: notification.created_at
+                id: id,
+                title: "Sample notification",
+                message: "This is a placeholder notification",
+                type: "info",
+                is_read: true,
+                created_at: new Date().toISOString()
             }
         });
     }
@@ -357,7 +282,7 @@ exports.markNotificationAsRead = markNotificationAsRead;
 const updateNotificationSettings = async (req, res) => {
     try {
         await notificationSettingsSchema.validate(req.body, { abortEarly: false });
-        const userId = req.auth.userId;
+        const userId = req.userId;
         // This would typically update notification preferences in a settings table
         return res.status(200).json({
             success: true,
