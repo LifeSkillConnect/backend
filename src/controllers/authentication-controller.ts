@@ -9,6 +9,7 @@ import {
   validateEmail,
   sendOtp,
   verifyOtp,
+  getOtpForTesting,
   createAccount,
   login,
   resetPassword,
@@ -158,6 +159,7 @@ router.get("/failure", (_req, res) => {
 router.post("/validate-email", validateEmail);
 router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
+router.get("/get-otp/:email", getOtpForTesting); // TEMPORARY - for testing only
 
 // ---------------- Account Routes ----------------
 router.post("/create-account", createAccount);

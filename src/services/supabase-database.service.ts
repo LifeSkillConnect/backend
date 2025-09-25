@@ -384,6 +384,24 @@ export class OtpService {
     return data as DatabaseOtp;
   }
 
+  static async findLatestByEmail(email: string): Promise<DatabaseOtp | null> {
+    const { data, error } = await supabase
+      .from('otp')
+      .select('*')
+      .eq('email', email)
+      .eq('is_used', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // No rows found
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    return data as DatabaseOtp;
+  }
+
   static async create(data: CreateOtpData): Promise<DatabaseOtp> {
     const { data: otp, error } = await supabase
       .from('otp')

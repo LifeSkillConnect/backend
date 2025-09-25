@@ -113,6 +113,22 @@ class OtpService {
         }
         return data;
     }
+    static async findLatestByEmail(email) {
+        const { data, error } = await supabase_1.supabase
+            .from('otp')
+            .select('*')
+            .eq('email', email)
+            .eq('is_used', false)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        if (error) {
+            if (error.code === 'PGRST116')
+                return null; // No rows found
+            throw new Error(`Database error: ${error.message}`);
+        }
+        return data;
+    }
     static async create(data) {
         const { data: otp, error } = await supabase_1.supabase
             .from('otp')

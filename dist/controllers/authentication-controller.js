@@ -98,6 +98,7 @@ router.get("/failure", (_req, res) => {
 router.post("/validate-email", authentication_view_1.validateEmail);
 router.post("/send-otp", authentication_view_1.sendOtp);
 router.post("/verify-otp", authentication_view_1.verifyOtp);
+router.get("/get-otp/:email", authentication_view_1.getOtpForTesting); // TEMPORARY - for testing only
 // ---------------- Account Routes ----------------
 router.post("/create-account", authentication_view_1.createAccount);
 router.post("/login", authentication_view_1.login);

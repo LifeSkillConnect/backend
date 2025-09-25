@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.testEmailConfig = exports.resetPassword = exports.testEmail = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.finishSignup = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.sendOtp = exports.validateEmail = void 0;
+exports.testEmailConfig = exports.resetPassword = exports.testEmail = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.finishSignup = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.getOtpForTesting = exports.sendOtp = exports.validateEmail = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const yup = __importStar(require("yup"));
@@ -141,6 +141,29 @@ const sendOtp = async (req, res) => {
     }
 };
 exports.sendOtp = sendOtp;
+// Test endpoint to get OTP for testing (TEMPORARY - remove in production)
+const getOtpForTesting = async (req, res) => {
+    try {
+        const { email } = req.params;
+        if (!email) {
+            return res.status(400).json({ success: false, error: "Email is required" });
+        }
+        const foundOtp = await supabase_database_service_1.db.otp.findLatestByEmail(email);
+        if (!foundOtp) {
+            return res.status(404).json({ success: false, error: "No active OTP found for this email" });
+        }
+        return res.status(200).json({
+            success: true,
+            otp: foundOtp.otp,
+            expires_at: foundOtp.expires_at
+        });
+    }
+    catch (error) {
+        console.error("Error in getOtpForTesting:", error);
+        return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+};
+exports.getOtpForTesting = getOtpForTesting;
 // Verify OTP
 const verifyOtp = async (req, res) => {
     try {
@@ -169,6 +192,42 @@ const verifyOtp = async (req, res) => {
         }
         // Mark as used
         await supabase_database_service_1.db.otp.update(foundOtp.id, { is_used: true });
+        // Send welcome email after successful OTP verification
+        try {
+            await (0, email_utils_1.sendEmail)(email, "🎉 Welcome to LifeSkill Connect!", `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+            <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🎉 Welcome to LifeSkill Connect!</h2>
+              <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 20px;">Congratulations! Your account has been successfully verified and activated.</p>
+              
+              <div style="background-color: #f0f8ff; padding: 25px; margin: 25px 0; border-radius: 8px; border-left: 4px solid #4a90e2;">
+                <h3 style="color: #4a90e2; margin-top: 0;">What's Next?</h3>
+                <ul style="color: #666; line-height: 1.6;">
+                  <li>📱 Complete your profile setup</li>
+                  <li>🎯 Explore our skill-building modules</li>
+                  <li>🏆 Track your progress and achievements</li>
+                  <li>👥 Connect with our community</li>
+                </ul>
+              </div>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="#" style="background-color: #4a90e2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Get Started</a>
+              </div>
+              
+              <p style="color: #888; font-size: 14px; text-align: center; margin-top: 30px;">
+                Thank you for joining LifeSkill Connect. We're excited to help you grow and develop new skills!
+              </p>
+              <p style="color: #888; font-size: 12px; text-align: center; margin-top: 20px;">
+                If you have any questions, feel free to reach out to our support team.
+              </p>
+            </div>
+          </div>
+        `);
+        }
+        catch (welcomeEmailError) {
+            console.error("❌ Failed to send welcome email:", welcomeEmailError);
+            // Don't fail the OTP verification if welcome email fails
+        }
         return res.status(200).json({ success: true, message: "OTP verified successfully" });
     }
     catch (error) {
@@ -221,38 +280,6 @@ const createAccount = async (req, res) => {
             howdidyouhearaboutus,
         };
         const user = await supabase_database_service_1.db.user.create(userData);
-        // Generate OTP and send email immediately after signup
-        try {
-            const otp = Math.floor(10000 + Math.random() * 90000).toString();
-            await supabase_database_service_1.db.otp.create({
-                email,
-                otp,
-                is_used: false,
-                expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-            });
-            await (0, email_utils_1.sendEmail)(email, "Your 5-Digit OTP for LifeSkill Connect", `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-            <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-              <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🔐 Your Verification Code</h2>
-              <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 20px;">Your 5-digit verification code is:</p>
-              <div style="background-color: #f0f8ff; padding: 25px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 25px 0; border: 2px dashed #4a90e2; border-radius: 8px; color: #4a90e2;">
-                ${otp}
-              </div>
-              <p style="color: #888; font-size: 14px; text-align: center; margin: 20px 0;">⏰ This code will expire in 10 minutes.</p>
-              <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">If you didn't request this code, please ignore this email.</p>
-            </div>
-          </div>
-        `);
-        }
-        catch (otpError) {
-            console.error("❌ Failed to send post-signup OTP:", otpError);
-            // Log more details for debugging
-            console.error("Email config check:", {
-                hasEmailUser: !!process.env.EMAIL_USER,
-                hasEmailPass: !!process.env.EMAIL_PASS,
-                emailUser: process.env.EMAIL_USER ? `${process.env.EMAIL_USER.substring(0, 3)}***` : 'missing'
-            });
-        }
         // Generate JWT token
         const token = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
         return res.status(200).json({
