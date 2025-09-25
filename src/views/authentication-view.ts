@@ -296,8 +296,11 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
 
     // Generate and send OTP after successful user creation
     try {
+      console.log("🔄 Starting OTP generation and sending for:", email);
+      
       // Generate 5-digit OTP
       const otp = Math.floor(10000 + Math.random() * 90000).toString();
+      console.log("🔢 Generated OTP:", otp);
 
       // Save OTP to database
       const otpData: CreateOtpData = {
@@ -307,9 +310,12 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes from now
       };
 
+      console.log("💾 Saving OTP to database...");
       await db.otp.create(otpData);
+      console.log("✅ OTP saved to database successfully");
 
       // Send OTP email
+      console.log("📧 Sending OTP email...");
       const emailResult = await sendEmail(
         email,
         "Your 5-Digit OTP for LifeSkill Connect",
@@ -331,6 +337,8 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
       if (!emailResult.success) {
         console.error("❌ Email sending failed:", emailResult.error);
         // Don't fail the registration if email fails, but log the error
+      } else {
+        console.log("✅ OTP email sent successfully!");
       }
     } catch (otpError) {
       console.error("❌ Error sending OTP:", otpError);
