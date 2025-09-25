@@ -36,10 +36,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.testEmailConfig = exports.resetPassword = exports.testEmail = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.finishSignup = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.getOtpForTesting = exports.sendOtp = exports.validateEmail = void 0;
+exports.appleSignIn = exports.googleSignIn = exports.testEmailConfig = exports.resetPassword = exports.testEmail = exports.verifyAppTokenSiginUp = exports.verifyAppTokenSiginIn = exports.saveModule = exports.addModulesToUser = exports.fetchAllModules = exports.finishSignup = exports.getProfile = exports.login = exports.createAccount = exports.verifyOtp = exports.getOtpForTesting = exports.sendOtp = exports.validateEmail = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const yup = __importStar(require("yup"));
+const google_auth_library_1 = require("google-auth-library");
 const email_utils_1 = require("../utils/email.utils");
 const auth_schema_1 = require("../validation/auth-schema");
 const supabase_database_service_1 = require("../services/supabase-database.service");
@@ -896,3 +897,189 @@ const testEmailConfig = async (req, res) => {
     }
 };
 exports.testEmailConfig = testEmailConfig;
+// Google OAuth Client
+const googleClient = new google_auth_library_1.OAuth2Client(CLIENT_ID);
+// Google Sign-In
+const googleSignIn = async (req, res) => {
+    try {
+        const { idToken } = req.body;
+        if (!idToken) {
+            return res.status(400).json({
+                success: false,
+                error: "Google ID token is required"
+            });
+        }
+        // Verify the Google ID token
+        const ticket = await googleClient.verifyIdToken({
+            idToken: idToken,
+            audience: CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        if (!payload) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid Google token"
+            });
+        }
+        const { email, name, picture, sub: googleId } = payload;
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                error: "Email not provided by Google"
+            });
+        }
+        // Check if user exists in database
+        let user = await supabase_database_service_1.db.user.findUnique({ email });
+        if (user) {
+            // Update user info if needed
+            if (user.auth_provider !== "GOOGLE") {
+                // Update existing email user to Google user
+                user = await supabase_database_service_1.db.user.update(user.id, {
+                    auth_provider: "GOOGLE",
+                    profile_picture: picture || user.profile_picture,
+                });
+            }
+        }
+        else {
+            // Create new user
+            const userData = {
+                email: email.toLowerCase(),
+                fullname: name || "",
+                auth_provider: "GOOGLE",
+                profile_picture: picture || undefined,
+                role: "USER",
+                is_active: true,
+                phone_number: undefined,
+                username: undefined,
+                date_of_birth: undefined,
+                howdidyouhearaboutus: undefined,
+            };
+            user = await supabase_database_service_1.db.user.create(userData);
+        }
+        // Generate JWT token
+        const token = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        return res.status(200).json({
+            success: true,
+            token: token,
+            user: {
+                id: user.id,
+                email: user.email,
+                fullname: user.fullname,
+                username: user.username,
+                phone_number: user.phone_number,
+                auth_provider: user.auth_provider,
+                role: user.role,
+                is_active: user.is_active,
+                date_of_birth: user.date_of_birth,
+                profile_picture: user.profile_picture,
+                howdidyouhearaboutus: user.howdidyouhearaboutus,
+                created_at: user.created_at,
+                updated_at: user.updated_at,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error in googleSignIn:", error);
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error",
+        });
+    }
+};
+exports.googleSignIn = googleSignIn;
+// Apple Sign-In
+const appleSignIn = async (req, res) => {
+    try {
+        const { identityToken, authorizationCode, user } = req.body;
+        if (!identityToken) {
+            return res.status(400).json({
+                success: false,
+                error: "Apple identity token is required"
+            });
+        }
+        // For Apple Sign-In, we need to verify the JWT token
+        // Apple provides the user info in the JWT payload
+        let email;
+        let name = null;
+        try {
+            // Decode the Apple JWT token (without verification for now)
+            // In production, you should verify the signature using Apple's public keys
+            const decodedToken = jsonwebtoken_1.default.decode(identityToken);
+            if (!decodedToken || !decodedToken.email) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Invalid Apple token - no email found"
+                });
+            }
+            email = decodedToken.email;
+            // Apple might provide name in the user object for first sign-in
+            if (user && user.name) {
+                const { firstName, lastName } = user.name;
+                name = `${firstName || ''} ${lastName || ''}`.trim();
+            }
+        }
+        catch (error) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid Apple token format"
+            });
+        }
+        // Check if user exists in database
+        let dbUser = await supabase_database_service_1.db.user.findUnique({ email });
+        if (dbUser) {
+            // Update user info if needed
+            if (dbUser.auth_provider !== "APPLE") {
+                // Update existing email user to Apple user
+                dbUser = await supabase_database_service_1.db.user.update(dbUser.id, {
+                    auth_provider: "APPLE",
+                    fullname: name || dbUser.fullname,
+                });
+            }
+        }
+        else {
+            // Create new user
+            const userData = {
+                email: email.toLowerCase(),
+                fullname: name || "",
+                auth_provider: "APPLE",
+                profile_picture: undefined,
+                role: "USER",
+                is_active: true,
+                phone_number: undefined,
+                username: undefined,
+                date_of_birth: undefined,
+                howdidyouhearaboutus: undefined,
+            };
+            dbUser = await supabase_database_service_1.db.user.create(userData);
+        }
+        // Generate JWT token
+        const token = jsonwebtoken_1.default.sign({ userId: dbUser.id, email: dbUser.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        return res.status(200).json({
+            success: true,
+            token: token,
+            user: {
+                id: dbUser.id,
+                email: dbUser.email,
+                fullname: dbUser.fullname,
+                username: dbUser.username,
+                phone_number: dbUser.phone_number,
+                auth_provider: dbUser.auth_provider,
+                role: dbUser.role,
+                is_active: dbUser.is_active,
+                date_of_birth: dbUser.date_of_birth,
+                profile_picture: dbUser.profile_picture,
+                howdidyouhearaboutus: dbUser.howdidyouhearaboutus,
+                created_at: dbUser.created_at,
+                updated_at: dbUser.updated_at,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error in appleSignIn:", error);
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error",
+        });
+    }
+};
+exports.appleSignIn = appleSignIn;

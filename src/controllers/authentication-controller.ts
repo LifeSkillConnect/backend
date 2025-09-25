@@ -21,6 +21,8 @@ import {
   verifyAppTokenSiginIn,
   verifyAppTokenSiginUp,
   finishSignup,
+  googleSignIn,
+  appleSignIn,
 } from "../views/authentication-view";
 import {
   startGoogleAuth,
@@ -169,6 +171,10 @@ router.post("/test-email-config", testEmailConfig);
 router.put("/reset-password", resetPassword);
 router.get("/profile", authenticate, getProfile);
 router.post("/finish-signup", authenticate, finishSignup);
+
+// ---------------- OAuth Routes ----------------
+router.post("/google-signin", googleSignIn);
+router.post("/apple-signin", appleSignIn);
 
 // ---------------- Google Auth Routes (Supabase) ----------------
 router.get("/google", startGoogleAuth);

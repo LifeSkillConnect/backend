@@ -107,6 +107,9 @@ router.post("/test-email-config", authentication_view_1.testEmailConfig);
 router.put("/reset-password", authentication_view_1.resetPassword);
 router.get("/profile", middleware_1.authenticate, authentication_view_1.getProfile);
 router.post("/finish-signup", middleware_1.authenticate, authentication_view_1.finishSignup);
+// ---------------- OAuth Routes ----------------
+router.post("/google-signin", authentication_view_1.googleSignIn);
+router.post("/apple-signin", authentication_view_1.appleSignIn);
 // ---------------- Google Auth Routes (Supabase) ----------------
 router.get("/google", supabase_auth_view_1.startGoogleAuth);
 router.get("/google/callback", supabase_auth_view_1.googleCallback);
