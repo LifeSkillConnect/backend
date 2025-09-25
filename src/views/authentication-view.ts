@@ -52,8 +52,9 @@ export const validateEmail = async (req: Request, res: Response): Promise<Respon
 export const sendOtp = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email }: { email: string } = req.body;
+    const normalizedEmail = (email || "").trim().toLowerCase();
 
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({ success: false, error: "Email is required" });
     }
 
@@ -78,7 +79,7 @@ export const sendOtp = async (req: Request, res: Response): Promise<Response> =>
 
     // Save OTP to database
     const otpData: CreateOtpData = {
-      email,
+      email: normalizedEmail,
       otp,
       is_used: false,
       expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes from now
@@ -88,7 +89,7 @@ export const sendOtp = async (req: Request, res: Response): Promise<Response> =>
 
     // Send email
     const emailResult = await sendEmail(
-      email,
+      normalizedEmail,
       "Your 5-Digit OTP for LifeSkill Connect",
       `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
@@ -131,12 +132,13 @@ export const sendOtp = async (req: Request, res: Response): Promise<Response> =>
 export const getOtpForTesting = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email } = req.params;
+    const normalizedEmail = (email || "").trim().toLowerCase();
     
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({ success: false, error: "Email is required" });
     }
 
-    const foundOtp = await db.otp.findLatestByEmail(email);
+    const foundOtp = await db.otp.findLatestByEmail(normalizedEmail);
 
     if (!foundOtp) {
       return res.status(404).json({ success: false, error: "No active OTP found for this email" });
@@ -157,14 +159,15 @@ export const getOtpForTesting = async (req: Request, res: Response): Promise<Res
 export const verifyOtp = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email, otp }: { email: string; otp: string } = req.body;
+    const normalizedEmail = (email || "").trim().toLowerCase();
 
-    if (!email || !otp) {
+    if (!normalizedEmail || !otp) {
       return res.status(400).json({ success: false, error: "Email and OTP are required" });
     }
 
     const foundOtp = await db.otp.findFirst({
       where: {
-        email,
+        email: normalizedEmail,
         otp,
         is_used: false,
       },
@@ -190,7 +193,7 @@ export const verifyOtp = async (req: Request, res: Response): Promise<Response> 
     // Send welcome email after successful OTP verification
     try {
       await sendEmail(
-        email,
+        normalizedEmail,
         "🎉 Welcome to LifeSkill Connect!",
         `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
@@ -252,12 +255,13 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
       howdidyouhearaboutus,
       phoneNumber,
     } = req.body;
+    const normalizedEmail = (email || "").trim().toLowerCase();
     
-    console.log("📧 Processing registration for email:", email);
+    console.log("📧 Processing registration for email:", normalizedEmail);
 
     // Check if user already exists
     console.log("🔍 Checking if user already exists...");
-    const existingUser = await db.user.findUnique({ email });
+    const existingUser = await db.user.findUnique({ email: normalizedEmail });
     if (existingUser) {
       console.log("❌ User already exists");
       return res.status(409).json({
@@ -274,7 +278,7 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
 
     // Create user in Supabase Auth via Admin API (auto-confirm)
     console.log("🔑 Creating user in Supabase Auth...");
-    const { user: authUser, error: authError } = await db.auth.signUp(email, password, {
+    const { user: authUser, error: authError } = await db.auth.signUp(normalizedEmail, password, {
       full_name: fullName,
       username,
       phone_number: phoneNumber,
@@ -294,7 +298,7 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
     // Create user in database table
     console.log("💾 Creating user in database table...");
     const userData: CreateUserData = {
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       fullname: fullName,
       username,
@@ -312,7 +316,7 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
     // Generate and send OTP after successful user creation
     console.log("🚨 ABOUT TO START OTP SECTION");
     try {
-      console.log("🔄 Starting OTP generation and sending for:", email);
+      console.log("🔄 Starting OTP generation and sending for:", normalizedEmail);
       
       // Generate 5-digit OTP
       const otp = Math.floor(10000 + Math.random() * 90000).toString();
@@ -320,7 +324,7 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
 
       // Save OTP to database
       const otpData: CreateOtpData = {
-        email,
+        email: normalizedEmail,
         otp,
         is_used: false,
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes from now
@@ -333,7 +337,7 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
       // Send OTP email
       console.log("📧 Sending OTP email...");
       const emailResult = await sendEmail(
-        email,
+        normalizedEmail,
         "Your 5-Digit OTP for LifeSkill Connect",
         `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
