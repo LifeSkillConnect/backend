@@ -351,13 +351,31 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
 
       if (!emailResult.success) {
         console.error("❌ Email sending failed:", emailResult.error);
-        throw new Error(`Failed to send OTP email: ${emailResult.error}`);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to send OTP email",
+          debug: {
+            otpGenerated: true,
+            otpSaved: true,
+            emailSent: false,
+            emailError: emailResult.error
+          }
+        });
       } else {
         console.log("✅ OTP email sent successfully!");
       }
     } catch (otpError: any) {
       console.error("❌ Error sending OTP:", otpError);
-      throw new Error(`OTP sending failed: ${otpError.message}`);
+      return res.status(500).json({
+        success: false,
+        error: "OTP sending failed",
+        debug: {
+          otpGenerated: false,
+          otpSaved: false,
+          emailSent: false,
+          error: otpError.message
+        }
+      });
     }
 
     // Generate JWT token
@@ -371,6 +389,11 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
       success: true,
       token: token,
       message: "Account created successfully. Please check your email for verification code.",
+      debug: {
+        otpSent: true,
+        email: email,
+        userId: user.id
+      },
       user: {
         id: user.id,
         email: user.email,
