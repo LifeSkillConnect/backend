@@ -42,7 +42,7 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
       rejected: info.rejected
     });
     return { success: true, messageId: info.messageId };
-  } catch (error) {
+  } catch (error: any) {
     console.error("❌ Error sending email:", {
       message: error.message,
       code: error.code,

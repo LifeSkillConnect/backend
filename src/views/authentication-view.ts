@@ -340,7 +340,7 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
       } else {
         console.log("✅ OTP email sent successfully!");
       }
-    } catch (otpError) {
+    } catch (otpError: any) {
       console.error("❌ Error sending OTP:", otpError);
       throw new Error(`OTP sending failed: ${otpError.message}`);
     }
