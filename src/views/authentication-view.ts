@@ -237,7 +237,11 @@ export const verifyOtp = async (req: Request, res: Response): Promise<Response> 
 // Create Account
 export const createAccount = async (req: Request, res: Response): Promise<Response> => {
   try {
+    console.log("🚀 Starting createAccount function");
+    console.log("📝 Request body:", req.body);
+    
     await createAccountSchema.validate(req.body, { abortEarly: false });
+    console.log("✅ Schema validation passed");
 
     const {
       email,
@@ -248,20 +252,28 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
       howdidyouhearaboutus,
       phoneNumber,
     } = req.body;
+    
+    console.log("📧 Processing registration for email:", email);
 
     // Check if user already exists
+    console.log("🔍 Checking if user already exists...");
     const existingUser = await db.user.findUnique({ email });
     if (existingUser) {
+      console.log("❌ User already exists");
       return res.status(409).json({
         success: false,
         error: "Email already exists. Please use a different email address.",
       });
     }
+    console.log("✅ User does not exist, proceeding...");
 
     // Hash password
+    console.log("🔐 Hashing password...");
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("✅ Password hashed");
 
     // Create user in Supabase Auth via Admin API (auto-confirm)
+    console.log("🔑 Creating user in Supabase Auth...");
     const { user: authUser, error: authError } = await db.auth.signUp(email, password, {
       full_name: fullName,
       username,
@@ -270,15 +282,17 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
     });
 
     if (authError) {
-      console.error("Supabase Auth error:", authError);
+      console.error("❌ Supabase Auth error:", authError);
       return res.status(400).json({
         success: false,
         error: "Failed to create account. Please try again.",
         details: authError.message,
       });
     }
+    console.log("✅ Supabase Auth user created");
 
     // Create user in database table
+    console.log("💾 Creating user in database table...");
     const userData: CreateUserData = {
       email,
       password: hashedPassword,
@@ -293,6 +307,7 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
     };
 
     const user = await db.user.create(userData);
+    console.log("✅ User created in database:", user.id);
 
     // Generate and send OTP after successful user creation
     try {
