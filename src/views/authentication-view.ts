@@ -310,6 +310,7 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
     console.log("✅ User created in database:", user.id);
 
     // Generate and send OTP after successful user creation
+    console.log("🚨 ABOUT TO START OTP SECTION");
     try {
       console.log("🔄 Starting OTP generation and sending for:", email);
       
@@ -392,7 +393,8 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
       debug: {
         otpSent: true,
         email: email,
-        userId: user.id
+        userId: user.id,
+        timestamp: new Date().toISOString()
       },
       user: {
         id: user.id,
