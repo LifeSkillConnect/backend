@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../config/supabase';
 import { db } from '../services/supabase-database.service';
+import { sendEmail } from "../utils/email.utils";
 import jwt from 'jsonwebtoken';
 
 const MOBILE_APP_SCHEME = process.env.MOBILE_APP_SCHEME || "lifeskillsconnect://";
@@ -83,6 +84,7 @@ export const googleCallback = async (req: Request, res: Response) => {
     const authProvider = (data.user.app_metadata?.provider || 'GOOGLE').toUpperCase() as 'GOOGLE' | 'APPLE' | 'EMAIL';
 
     let user = await db.user.findUnique({ email });
+    let createdNow = false;
 
     if (!user) {
       user = await db.user.create({
@@ -93,6 +95,7 @@ export const googleCallback = async (req: Request, res: Response) => {
         is_active: true,
         role: 'USER',
       });
+      createdNow = true;
     } else {
       user = await db.user.update(user.id, {
         fullname,
@@ -114,6 +117,38 @@ export const googleCallback = async (req: Request, res: Response) => {
     );
 
     const isNewUser = !user.username || !user.phone_number;
+
+    // Send welcome email only on first-time account creation via Google
+    if (createdNow) {
+      try {
+        await sendEmail(
+          email,
+          "🎉 Welcome to LifeSkill Connect!",
+          `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+              <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🎉 Welcome to LifeSkill Connect!</h2>
+                <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 20px;">Thanks for signing up with Google. Your account is ready.</p>
+                <div style="background-color: #f0f8ff; padding: 25px; margin: 25px 0; border-radius: 8px; border-left: 4px solid #4a90e2;">
+                  <h3 style="color: #4a90e2; margin-top: 0;">What's Next?</h3>
+                  <ul style="color: #666; line-height: 1.6;">
+                    <li>📱 Complete your profile setup</li>
+                    <li>🎯 Explore our skill-building modules</li>
+                    <li>🏆 Track your progress and achievements</li>
+                    <li>👥 Connect with our community</li>
+                  </ul>
+                </div>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="#" style="background-color: #4a90e2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Get Started</a>
+                </div>
+              </div>
+            </div>
+          `
+        );
+      } catch (welcomeEmailError) {
+        console.error("❌ Failed to send Google welcome email:", welcomeEmailError);
+      }
+    }
 
     if (isNewUser) {
       return res.redirect(`${process.env.GOOGLE_REDIRECT_URI}/verify-2/${token}`);
