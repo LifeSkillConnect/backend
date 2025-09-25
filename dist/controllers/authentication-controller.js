@@ -95,6 +95,7 @@ router.get("/failure", (_req, res) => {
     res.status(401).json({ error: "Apple login failed" });
 });
 // ---------------- Email & OTP Routes ----------------
+router.get("/version", (_req, res) => res.json({ version: "otp-normalized-1" }));
 router.post("/validate-email", authentication_view_1.validateEmail);
 router.post("/send-otp", authentication_view_1.sendOtp);
 router.post("/verify-otp", authentication_view_1.verifyOtp);

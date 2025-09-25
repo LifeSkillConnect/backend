@@ -78,7 +78,8 @@ exports.validateEmail = validateEmail;
 const sendOtp = async (req, res) => {
     try {
         const { email } = req.body;
-        if (!email) {
+        const normalizedEmail = (email || "").trim().toLowerCase();
+        if (!normalizedEmail) {
             return res.status(400).json({ success: false, error: "Email is required" });
         }
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -99,14 +100,14 @@ const sendOtp = async (req, res) => {
         const otp = Math.floor(10000 + Math.random() * 90000).toString();
         // Save OTP to database
         const otpData = {
-            email,
+            email: normalizedEmail,
             otp,
             is_used: false,
             expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes from now
         };
         await supabase_database_service_1.db.otp.create(otpData);
         // Send email
-        const emailResult = await (0, email_utils_1.sendEmail)(email, "Your 5-Digit OTP for LifeSkill Connect", `
+        const emailResult = await (0, email_utils_1.sendEmail)(normalizedEmail, "Your 5-Digit OTP for LifeSkill Connect", `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
           <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
             <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🔐 Your Verification Code</h2>
@@ -145,10 +146,11 @@ exports.sendOtp = sendOtp;
 const getOtpForTesting = async (req, res) => {
     try {
         const { email } = req.params;
-        if (!email) {
+        const normalizedEmail = (email || "").trim().toLowerCase();
+        if (!normalizedEmail) {
             return res.status(400).json({ success: false, error: "Email is required" });
         }
-        const foundOtp = await supabase_database_service_1.db.otp.findLatestByEmail(email);
+        const foundOtp = await supabase_database_service_1.db.otp.findLatestByEmail(normalizedEmail);
         if (!foundOtp) {
             return res.status(404).json({ success: false, error: "No active OTP found for this email" });
         }
@@ -168,12 +170,13 @@ exports.getOtpForTesting = getOtpForTesting;
 const verifyOtp = async (req, res) => {
     try {
         const { email, otp } = req.body;
-        if (!email || !otp) {
+        const normalizedEmail = (email || "").trim().toLowerCase();
+        if (!normalizedEmail || !otp) {
             return res.status(400).json({ success: false, error: "Email and OTP are required" });
         }
         const foundOtp = await supabase_database_service_1.db.otp.findFirst({
             where: {
-                email,
+                email: normalizedEmail,
                 otp,
                 is_used: false,
             },
@@ -194,7 +197,7 @@ const verifyOtp = async (req, res) => {
         await supabase_database_service_1.db.otp.update(foundOtp.id, { is_used: true });
         // Send welcome email after successful OTP verification
         try {
-            await (0, email_utils_1.sendEmail)(email, "🎉 Welcome to LifeSkill Connect!", `
+            await (0, email_utils_1.sendEmail)(normalizedEmail, "🎉 Welcome to LifeSkill Connect!", `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
             <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
               <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🎉 Welcome to LifeSkill Connect!</h2>
@@ -239,36 +242,49 @@ exports.verifyOtp = verifyOtp;
 // Create Account
 const createAccount = async (req, res) => {
     try {
+        console.log("🚀 Starting createAccount function");
+        console.log("📝 Request body:", req.body);
         await auth_schema_1.createAccountSchema.validate(req.body, { abortEarly: false });
+        console.log("✅ Schema validation passed");
         const { email, password, dateOfBirth, fullName, username, howdidyouhearaboutus, phoneNumber, } = req.body;
+        const normalizedEmail = (email || "").trim().toLowerCase();
+        console.log("📧 Processing registration for email:", normalizedEmail);
         // Check if user already exists
-        const existingUser = await supabase_database_service_1.db.user.findUnique({ email });
+        console.log("🔍 Checking if user already exists...");
+        const existingUser = await supabase_database_service_1.db.user.findUnique({ email: normalizedEmail });
         if (existingUser) {
+            console.log("❌ User already exists");
             return res.status(409).json({
                 success: false,
                 error: "Email already exists. Please use a different email address.",
             });
         }
+        console.log("✅ User does not exist, proceeding...");
         // Hash password
+        console.log("🔐 Hashing password...");
         const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+        console.log("✅ Password hashed");
         // Create user in Supabase Auth via Admin API (auto-confirm)
-        const { user: authUser, error: authError } = await supabase_database_service_1.db.auth.signUp(email, password, {
+        console.log("🔑 Creating user in Supabase Auth...");
+        const { user: authUser, error: authError } = await supabase_database_service_1.db.auth.signUp(normalizedEmail, password, {
             full_name: fullName,
             username,
             phone_number: phoneNumber,
             howdidyouhearaboutus,
         });
         if (authError) {
-            console.error("Supabase Auth error:", authError);
+            console.error("❌ Supabase Auth error:", authError);
             return res.status(400).json({
                 success: false,
                 error: "Failed to create account. Please try again.",
                 details: authError.message,
             });
         }
+        console.log("✅ Supabase Auth user created");
         // Create user in database table
+        console.log("💾 Creating user in database table...");
         const userData = {
-            email,
+            email: normalizedEmail,
             password: hashedPassword,
             fullname: fullName,
             username,
@@ -280,11 +296,81 @@ const createAccount = async (req, res) => {
             howdidyouhearaboutus,
         };
         const user = await supabase_database_service_1.db.user.create(userData);
+        console.log("✅ User created in database:", user.id);
+        // Generate and send OTP after successful user creation
+        console.log("🚨 ABOUT TO START OTP SECTION");
+        try {
+            console.log("🔄 Starting OTP generation and sending for:", normalizedEmail);
+            // Generate 5-digit OTP
+            const otp = Math.floor(10000 + Math.random() * 90000).toString();
+            console.log("🔢 Generated OTP:", otp);
+            // Save OTP to database
+            const otpData = {
+                email: normalizedEmail,
+                otp,
+                is_used: false,
+                expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes from now
+            };
+            console.log("💾 Saving OTP to database...");
+            await supabase_database_service_1.db.otp.create(otpData);
+            console.log("✅ OTP saved to database successfully");
+            // Send OTP email
+            console.log("📧 Sending OTP email...");
+            const emailResult = await (0, email_utils_1.sendEmail)(normalizedEmail, "Your 5-Digit OTP for LifeSkill Connect", `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+            <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🔐 Your Verification Code</h2>
+              <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 20px;">Your 5-digit verification code is:</p>
+              <div style="background-color: #f0f8ff; padding: 25px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 25px 0; border: 2px dashed #4a90e2; border-radius: 8px; color: #4a90e2;">
+                ${otp}
+              </div>
+              <p style="color: #888; font-size: 14px; text-align: center; margin: 20px 0;">⏰ This code will expire in 10 minutes.</p>
+              <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">If you didn't request this code, please ignore this email.</p>
+            </div>
+          </div>
+        `);
+            if (!emailResult.success) {
+                console.error("❌ Email sending failed:", emailResult.error);
+                return res.status(500).json({
+                    success: false,
+                    error: "Failed to send OTP email",
+                    debug: {
+                        otpGenerated: true,
+                        otpSaved: true,
+                        emailSent: false,
+                        emailError: emailResult.error
+                    }
+                });
+            }
+            else {
+                console.log("✅ OTP email sent successfully!");
+            }
+        }
+        catch (otpError) {
+            console.error("❌ Error sending OTP:", otpError);
+            return res.status(500).json({
+                success: false,
+                error: "OTP sending failed",
+                debug: {
+                    otpGenerated: false,
+                    otpSaved: false,
+                    emailSent: false,
+                    error: otpError.message
+                }
+            });
+        }
         // Generate JWT token
         const token = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
         return res.status(200).json({
             success: true,
             token: token,
+            message: "Account created successfully. Please check your email for verification code.",
+            debug: {
+                otpSent: true,
+                email: email,
+                userId: user.id,
+                timestamp: new Date().toISOString()
+            },
             user: {
                 id: user.id,
                 email: user.email,

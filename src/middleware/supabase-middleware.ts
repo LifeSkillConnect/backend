@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { supabaseAdmin } from '../config/supabase';
+import jwt from 'jsonwebtoken';
 import { db } from '../services/supabase-database.service';
 
 export const authenticate = async (req: any, res: Response, next: NextFunction) => {
@@ -15,16 +15,18 @@ export const authenticate = async (req: any, res: Response, next: NextFunction) 
 
     const token = authHeader.substring(7);
 
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    // Verify the custom JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
 
-    if (error || !user) {
+    if (!decoded.userId || !decoded.email) {
       return res.status(401).json({
         success: false,
-        error: 'Invalid token'
+        error: 'Invalid token payload'
       });
     }
 
-    const dbUser = await db.user.findUnique({ email: user.email! });
+    // Find user in database using the decoded email
+    const dbUser = await db.user.findUnique({ email: decoded.email });
 
     if (!dbUser) {
       return res.status(404).json({
@@ -39,6 +41,12 @@ export const authenticate = async (req: any, res: Response, next: NextFunction) 
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid token'
+      });
+    }
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

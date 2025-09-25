@@ -27,7 +27,7 @@ app.use((0, morgan_1.default)("tiny"));
 app.use(express_1.default.urlencoded({ extended: true }));
 // Root route
 app.get("/", (req, res) => {
-    res.send("Hello from Express + Vercel + TypeScript! - OAuth Expo URL Fix Applied");
+    res.send("Hello from Express + Vercel + TypeScript! - build: otp-normalized-1");
 });
 // Health check route
 app.get("/health", (_req, res) => {

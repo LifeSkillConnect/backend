@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCurrentUser = exports.signOut = exports.verifySupabaseToken = exports.googleCallback = exports.startGoogleAuth = void 0;
 const supabase_1 = require("../config/supabase");
 const supabase_database_service_1 = require("../services/supabase-database.service");
+const email_utils_1 = require("../utils/email.utils");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const MOBILE_APP_SCHEME = process.env.MOBILE_APP_SCHEME || "lifeskillsconnect://";
 /**
@@ -75,6 +76,7 @@ const googleCallback = async (req, res) => {
         const profilePicture = ((_e = data.user.user_metadata) === null || _e === void 0 ? void 0 : _e.avatar_url) || ((_f = data.user.user_metadata) === null || _f === void 0 ? void 0 : _f.picture) || null;
         const authProvider = (((_g = data.user.app_metadata) === null || _g === void 0 ? void 0 : _g.provider) || 'GOOGLE').toUpperCase();
         let user = await supabase_database_service_1.db.user.findUnique({ email });
+        let createdNow = false;
         if (!user) {
             user = await supabase_database_service_1.db.user.create({
                 email,
@@ -84,6 +86,7 @@ const googleCallback = async (req, res) => {
                 is_active: true,
                 role: 'USER',
             });
+            createdNow = true;
         }
         else {
             user = await supabase_database_service_1.db.user.update(user.id, {
@@ -100,6 +103,34 @@ const googleCallback = async (req, res) => {
             provider: 'google'
         }, process.env.JWT_SECRET, { expiresIn: '7d' });
         const isNewUser = !user.username || !user.phone_number;
+        // Send welcome email only on first-time account creation via Google
+        if (createdNow) {
+            try {
+                await (0, email_utils_1.sendEmail)(email, "🎉 Welcome to LifeSkill Connect!", `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+              <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🎉 Welcome to LifeSkill Connect!</h2>
+                <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 20px;">Thanks for signing up with Google. Your account is ready.</p>
+                <div style="background-color: #f0f8ff; padding: 25px; margin: 25px 0; border-radius: 8px; border-left: 4px solid #4a90e2;">
+                  <h3 style="color: #4a90e2; margin-top: 0;">What's Next?</h3>
+                  <ul style="color: #666; line-height: 1.6;">
+                    <li>📱 Complete your profile setup</li>
+                    <li>🎯 Explore our skill-building modules</li>
+                    <li>🏆 Track your progress and achievements</li>
+                    <li>👥 Connect with our community</li>
+                  </ul>
+                </div>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="#" style="background-color: #4a90e2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Get Started</a>
+                </div>
+              </div>
+            </div>
+          `);
+            }
+            catch (welcomeEmailError) {
+                console.error("❌ Failed to send Google welcome email:", welcomeEmailError);
+            }
+        }
         if (isNewUser) {
             return res.redirect(`${process.env.GOOGLE_REDIRECT_URI}/verify-2/${token}`);
         }
