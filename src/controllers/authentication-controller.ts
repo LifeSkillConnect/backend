@@ -156,6 +156,7 @@ router.get("/failure", (_req, res) => {
 });
 
 // ---------------- Email & OTP Routes ----------------
+router.get("/version", (_req, res) => res.json({ version: "otp-normalized-1" }));
 router.post("/validate-email", validateEmail);
 router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
