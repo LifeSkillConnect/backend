@@ -294,6 +294,49 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
 
     const user = await db.user.create(userData);
 
+    // Generate and send OTP after successful user creation
+    try {
+      // Generate 5-digit OTP
+      const otp = Math.floor(10000 + Math.random() * 90000).toString();
+
+      // Save OTP to database
+      const otpData: CreateOtpData = {
+        email,
+        otp,
+        is_used: false,
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes from now
+      };
+
+      await db.otp.create(otpData);
+
+      // Send OTP email
+      const emailResult = await sendEmail(
+        email,
+        "Your 5-Digit OTP for LifeSkill Connect",
+        `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+            <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h2 style="color: #333; text-align: center; margin-bottom: 30px;">🔐 Your Verification Code</h2>
+              <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 20px;">Your 5-digit verification code is:</p>
+              <div style="background-color: #f0f8ff; padding: 25px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 25px 0; border: 2px dashed #4a90e2; border-radius: 8px; color: #4a90e2;">
+                ${otp}
+              </div>
+              <p style="color: #888; font-size: 14px; text-align: center; margin: 20px 0;">⏰ This code will expire in 10 minutes.</p>
+              <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">If you didn't request this code, please ignore this email.</p>
+            </div>
+          </div>
+        `
+      );
+
+      if (!emailResult.success) {
+        console.error("❌ Email sending failed:", emailResult.error);
+        // Don't fail the registration if email fails, but log the error
+      }
+    } catch (otpError) {
+      console.error("❌ Error sending OTP:", otpError);
+      // Don't fail the registration if OTP fails, but log the error
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email },
@@ -304,6 +347,7 @@ export const createAccount = async (req: Request, res: Response): Promise<Respon
     return res.status(200).json({
       success: true,
       token: token,
+      message: "Account created successfully. Please check your email for verification code.",
       user: {
         id: user.id,
         email: user.email,
